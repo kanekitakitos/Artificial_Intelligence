@@ -1,163 +1,113 @@
 package core;
+
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
-
 /**
- * Represents a state (configuration) in the array sorting problem.
- * This class implements the {@link Ilayout} interface, providing the specific logic
- * for generating children (by swapping elements), calculating costs, and checking for the goal state.
- *
- * @preConditions
- *                 - The constructor `ArrayCfg(String)` must be called with a string of space-separated integers.
- * @postConditions
- *                  - An immutable `ArrayCfg` object is created.
- *                  - The object can generate its children, be compared to a goal, and provide its step cost.
- *
- * @see Ilayout
- *
- * @author Brandon Mejia
- * @version 2025-09-27
+ * Immutable array configuration implementing Ilayout.
  */
-public class ArrayCfg implements Ilayout
-{
+public final class ArrayCfg implements Ilayout {
+
     private final int[] data;
-    private final double cost; // Cost to generate this state from its parent
-    /**
-     * Constructs an array configuration from a string of space-separated integers.
-     * This constructor is used for the initial and goal states.
-     *
-     * @preConditions
-     *                 - The input string `s` must contain valid integers separated by spaces.
-     *                 - Non-integer values will cause a `NumberFormatException`.
-     * @postConditions
-     *                  - A new `ArrayCfg` object is created with the specified integer configuration.
-     *                  - The step cost (`cost`) is initialized to 0.
-     *
-     * @param s The string representing the array configuration.
-     */
-    public ArrayCfg(String s)
-    {
-        this.data = Arrays.stream(s.split(" ")).mapToInt(Integer::parseInt).toArray();
-        this.cost = 0; // Initial state has no parent, cost is 0
+    private final int cost; // cost of the swap that produced this state (0 for initial)
+
+    // Constructor used for initial/goal states (from a string).
+    public ArrayCfg(String s) {
+        if (s == null) throw new IllegalArgumentException("Input string cannot be null");
+        String trimmed = s.trim();
+        if (trimmed.isEmpty()) {
+            this.data = new int[0];
+        } else {
+            // split on any whitespace sequence (handles multiple spaces, tabs, etc.)
+            String[] parts = trimmed.split("\\s+");
+            int[] parsed = Arrays.stream(parts).mapToInt(Integer::parseInt).toArray();
+            this.data = Arrays.copyOf(parsed, parsed.length); // defensive copy
+        }
+        this.cost = 0;
     }
 
-    /**
-     * Private constructor for creating successor states (children).
-     * @param data The new integer array for the child state.
-     * @param cost The cost of the swap that generated this child state.
-     */
-    private ArrayCfg(int[] data, double cost) {
-        this.data = data;
+    // Private constructor for children
+    private ArrayCfg(int[] data, int cost) {
+        this.data = data; // already a copy by caller
         this.cost = cost;
     }
 
-    /**
-     * Generates all valid successor states by swapping pairs of elements.
-     * The swapping order is from left to right, as specified in the problem statement.
-     * @return A list of new `ArrayCfg` objects representing all possible next states.
-     */
     @Override
-    public List<Ilayout> children()
-    {
-        List<Ilayout> children = new ArrayList<>();
-        for (int i = 0; i < data.length - 1; i++) {
-            for (int j = i + 1; j < data.length; j++) {
-                int[] childData = Arrays.copyOf(data, data.length);
+    public List<Ilayout> children() {
+        int n = data.length;
+        if (n < 2) return Collections.emptyList();
 
-                // Swap elements
-                int temp = childData[i];
+        List<Ilayout> children = new ArrayList<>(n * (n - 1) / 2);
+        for (int i = 0; i < n - 1; i++) {
+            for (int j = n-1; j > i ; j--) {
+                int[] childData = Arrays.copyOf(data, n);
+
+                // swap
+                int tmp = childData[i];
                 childData[i] = childData[j];
-                childData[j] = temp;
+                childData[j] = tmp;
 
-                // Calculate cost
-                double swapCost = calculateCost(data[i], data[j]);
+                // compute cost using original values from parent
+                int swapCost = calculateCost(data[i], data[j]);
 
                 children.add(new ArrayCfg(childData, swapCost));
             }
         }
-        return children;
+        return Collections.unmodifiableList(children);
     }
 
     /**
-     * Calculates the cost of swapping two integers based on their parity.
-     * @param a The first integer.
-     * @param b The second integer.
-     * @return The cost of the swap (2, 11, or 20).
+     * Compute swap cost:
+     * - even & even -> 2
+     * - odd & odd -> 20
+     * - mixed -> 11
      */
-    private double calculateCost(int a, int b)
-    {
-        boolean isAEven = a % 2 == 0;
-        boolean isBEven = b % 2 == 0;
+    private static int calculateCost(int a, int b) {
+        // Using bitwise to check parity; works for negative numbers too.
+        boolean aEven = (a & 1) == 0;
+        boolean bEven = (b & 1) == 0;
 
-        if (isAEven && isBEven)
-            return 2.0;
-
-         else if (!isAEven && !isBEven)
-            return 20;
-
-         else
-            return 11;
-
+        if (aEven && bEven) return 2;
+        if (!aEven && !bEven) return 20;
+        return 11;
     }
 
-    /**
-     * Checks if this configuration is the goal state by comparing it to another layout.
-     * @param l The goal layout to compare against.
-     * @return `true` if this configuration is identical to the goal layout, `false` otherwise.
-     */
     @Override
-    public boolean isGoal(Ilayout l)
-    {
-        return this.equals(l);
+    public boolean isGoal(Ilayout l) {
+        if (!(l instanceof ArrayCfg)) return false;
+        return Arrays.equals(this.data, ((ArrayCfg) l).data);
     }
 
-    /**
-     * Gets the cost of the single swap that led to this configuration.
-     * @return The cost of the move from the parent state.
-     */
     @Override
-    public double getK()
-    {
-        return this.cost;
+    public double getK() {
+        return (double) this.cost;
     }
 
-    /**
-     * Returns a string representation of the array for display.
-     * Integers are separated by spaces.
-     * @return A formatted string of the array configuration.
-     */
     @Override
-    public String toString()
-    {
+    public String toString() {
         return Arrays.stream(data)
                 .mapToObj(String::valueOf)
                 .collect(Collectors.joining(" "));
     }
-    /**
-     * Compares this configuration with another object for equality.
-     * @param o The object to compare with.
-     * @return `true` if the other object is an `ArrayCfg` with the exact same integer array.
-     */
-    @Override
-    public boolean equals(Object o)
-    {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
 
-        ArrayCfg arrayCfg = (ArrayCfg) o;
-        return Arrays.equals(data, arrayCfg.data);
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof ArrayCfg)) return false;
+        ArrayCfg other = (ArrayCfg) o;
+        return Arrays.equals(this.data, other.data);
     }
 
-    /**
-     * Computes the hash code for this configuration.
-     * The hash code is based on the contents of the integer array.
-     * @return The hash code for this configuration.
-     */
     @Override
     public int hashCode() {
         return Arrays.hashCode(data);
+    }
+
+    // Optional: expose a defensive copy if needed elsewhere
+    public int[] asArrayCopy() {
+        return Arrays.copyOf(data, data.length);
     }
 }
