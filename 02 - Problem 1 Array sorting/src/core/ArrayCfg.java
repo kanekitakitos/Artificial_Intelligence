@@ -25,7 +25,6 @@ public class ArrayCfg implements Ilayout
 {
     private final int[] data;
     private final double cost; // Cost to generate this state from its parent
-    private final int cachedHashCode;
     /**
      * Constructs an array configuration from a string of space-separated integers.
      * This constructor is used for the initial and goal states.
@@ -43,7 +42,6 @@ public class ArrayCfg implements Ilayout
     {
         this.data = Arrays.stream(s.split(" ")).mapToInt(Integer::parseInt).toArray();
         this.cost = 0; // Initial state has no parent, cost is 0
-        this.cachedHashCode = Arrays.hashCode(this.data);
     }
 
     /**
@@ -54,7 +52,6 @@ public class ArrayCfg implements Ilayout
     private ArrayCfg(int[] data, double cost) {
         this.data = data;
         this.cost = cost;
-        this.cachedHashCode = Arrays.hashCode(this.data);
     }
 
     /**
@@ -65,9 +62,7 @@ public class ArrayCfg implements Ilayout
     @Override
     public List<Ilayout> children()
     {
-        int n = data.length;
-        // Pre-allocate memory to avoid list resizing
-        List<Ilayout> children = new ArrayList<>(n * (n - 1) / 2);
+        List<Ilayout> children = new ArrayList<>();
         for (int i = 0; i < data.length - 1; i++) {
             for (int j = i + 1; j < data.length; j++) {
                 int[] childData = Arrays.copyOf(data, data.length);
@@ -163,6 +158,6 @@ public class ArrayCfg implements Ilayout
      */
     @Override
     public int hashCode() {
-        return this.cachedHashCode;
+        return Arrays.hashCode(data);
     }
 }
