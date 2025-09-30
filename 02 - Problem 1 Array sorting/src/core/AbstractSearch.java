@@ -1,58 +1,114 @@
+
 package core;
 
 import java.util.*;
 
 /**
- * Implements the Template Method design pattern for graph search algorithms.
- * This abstract class defines the skeleton of a search algorithm in the `solve` method,
- * leaving the specific strategy for ordering nodes (the "fringe") to be implemented
- * by subclasses through the `createFringe` method.
+ * An abstract base class for implementing state-space search algorithms using the Template Method pattern.
+ * <p>
+ * This class provides the core search loop, management of open (fringe) and closed lists,
+ * and path reconstruction. The `fechados` (closed) list is implemented as a map that not only
+ * tracks visited states but also stores the best path found so far to each state, enabling
+ * efficient pruning and path optimization.
  *
- * @author Brandon Mejia
- * @preConditions
- *                 - Subclasses must implement the `createFringe()` method to define a search strategy.
- *                 - The `solve` method must be called with valid, non-null initial and goal layouts.
- * @postConditions
- *                  - The `solve` method returns an iterator for the solution path if one is found, or null otherwise.
- *                  - The state of the search (open/closed lists) is managed internally.
+ * <h3>Implementing a Search Strategy</h3>
+ * To implement a specific search algorithm, extend this class and provide an implementation for the
+ * {@link #createFringe()} method. The type of {@link Queue} returned determines the search strategy.
  *
+ * <h4>Uniform-Cost Search (UCS)</h4>
+ * <p>
+ * Expands the node with the lowest path cost (g). Guarantees the least-cost path.
+ * </p>
+ * <ul>
+ *   <li><b>Data Structure:</b> {@link PriorityQueue}</li>
+ *   <li><b>Comparator:</b> Order by `State::getG`. For stable sorting (FIFO for same-cost nodes), use a
+ *       secondary comparison on the state's sequence ID.
+ *       <pre>{@code
+ *       Comparator<State> comparator = Comparator.comparingDouble(State::getG)
+ *                                                .thenComparingLong(State::getSequenceId);
+ *       return new PriorityQueue<>(comparator);
+ *       }</pre>
+ *   </li>
+ * </ul>
+ *
+ * <h4>Breadth-First Search (BFS)</h4>
+ * <p>
+ * Expands nodes level by level. Guarantees the shortest path in terms of number of steps,
+ * assuming all step costs are equal.
+ * </p>
+ * <ul>
+ *   <li><b>Data Structure:</b> A simple FIFO queue, like {@link LinkedList}.</li>
+ *   <li><b>Implementation:</b>
+ *       <pre>{@code return new LinkedList<>();}</pre>
+ *   </li>
+ * </ul>
+ *
+ * <h4>Depth-First Search (DFS)</h4>
+ * <p>
+ * Expands the deepest node first. It's not optimal and may not find a solution if the
+ * search space has infinite branches.
+ * </p>
+ * <ul>
+ *   <li><b>Data Structure:</b> A LIFO stack, which can be implemented with {@link ArrayDeque}.</li>
+ *   <li><b>Implementation:</b> Since the `solve` method uses `queue.add(e)`, which adds to the end,
+ *       we must override it to add to the front to simulate a stack's `push` operation.
+ *       <pre>{@code
+ *       return new ArrayDeque<>() {
+ *           @Override
+ *           public boolean add(State state) {
+ *               this.addFirst(state);
+ *               return true;
+ *           }
+ *       };
+ *       }</pre>
+ *   </li>
+ * </ul>
+ *
+ * @preConditions Subclasses must implement {@link #createFringe()}.
+ * @postConditions The {@link #solve} method returns an iterator for the solution path or null if no solution is found.
  *
  * @see Ilayout
  * @see State
  *
- * @version 2025-09-27
+ * @author Brandon Mejia
+ * @version 2025-09-30
  */
-public abstract class AbstractSearch
-{
+public abstract class AbstractSearch {
     protected Queue<State> abertos;
-    protected Map<Ilayout, State> fechados;
+    protected Map<Ilayout, State> fechados; // Using this map to track the best state found for a layout
     protected State actual;
     protected Ilayout objective;
+    private static long sequenceCounter = 0;
 
     /**
-     * Represents a node in the search tree, wrapping a layout and maintaining search-related information.
-     * Each state holds a reference to its parent, allowing for path reconstruction, and stores the
-     * accumulated cost (`g`) from the initial state to this node.
+     * Represents a node in the search space. It contains the layout (the actual state),
+     * a reference to its parent node (for path reconstruction), the accumulated cost (`g`)
+     * from the start node, and a unique sequence ID for tie-breaking.
      */
-    public static class State
-    {
+    public static class State {
         private final Ilayout layout;
         private final State father;
-        private final double g; // Accumulated cost of the path from the start to this state
+        private final double g; // Cost from start to current state
+        private final long sequenceId;
 
         /**
-         * Constructs a search node.
-         * The accumulated cost `g` is calculated by adding the parent's cost
-         * to the cost of the step leading to the current layout.
-         * @param l The layout for this state.
-         * @param n The parent state in the search tree.
+         * Constructs a new State.
+         * <p>
+         * The accumulated cost `g` is calculated based on the parent's cost plus the
+         * cost of the step leading to this state. The initial state has a cost of 0.
+         * @param l The layout of this state.
+         * @param n The parent state (null for the initial state).
          */
         public State(Ilayout l, State n) {
             layout = l;
             father = n;
-            if (father != null)
-                g = father.g + layout.getK(); // Use getK() from Ilayout for step cost
-            else g = 0.0;
+            sequenceId = AbstractSearch.sequenceCounter++;
+
+            if (father != null) {
+                g = father.g + layout.getK();
+            } else {
+                g = 0.0;
+            }
         }
 
         @Override
@@ -60,81 +116,71 @@ public abstract class AbstractSearch
             return layout.toString();
         }
 
-        /**
-         * Gets the total accumulated cost from the initial state to this state.
-         * This is used by the Main class to print the final solution cost.
-         * @return The total path cost (g).
-         */
-        public double getK() {
-            return g;
-        }
-
-        /**
-         * Gets the total accumulated cost from the initial state to this state.
-         * This is used internally by search strategies (e.g., in a PriorityQueue) for ordering.
-         * @return The total path cost (g).
-         */
-        public double getG() {
-            return g;
-        }
-
-        /** @return The layout of this state. */
+        public double getK() { return g; }
+        public double getG() { return g; }
+        public long getSequenceId() { return sequenceId; }
         public Ilayout getLayout() { return layout; }
-        /** @return The parent state in the search path. */
         public State getFather() { return father; }
 
         @Override
         public int hashCode() { return layout.hashCode(); }
 
         @Override
-        public boolean equals(Object o)
-        {
-            if (o == null || this.getClass() != o.getClass()) return false;
+        public boolean equals(Object o) {
+            if (o == null || getClass() != o.getClass()) return false;
             State n = (State) o;
             return this.layout.equals(n.layout);
         }
     }
 
     /**
-     * Generates the successor states for a given search node.
-     * This method is common to most graph search algorithms.
-     * @param n The parent node.
-     * @return A list of `State` objects representing the children.
+     * Generates all successor states for a given state.
+     *
+     * @param n The state to expand.
+     * @return A list of successor states.
      */
-    protected final List<State> generateSuccessors(State n)
-    {
+    protected final List<State> generateSuccessors(State n) {
         List<State> sucs = new ArrayList<>();
         List<Ilayout> children = n.layout.children();
-
-        for (Ilayout e : children)
+        for (Ilayout e : children) {
             sucs.add(new State(e, n));
+        }
         return sucs;
     }
 
     /**
-     * The "Template Method". It defines the invariant skeleton of the search algorithm.
-     * It uses the `createFringe` hook method to allow subclasses to define
-     * the search strategy.
-     * @param s The initial layout of the problem.
-     * @param goal The goal layout of the problem.
-     * @return An iterator over the states of the solution path, or null if no solution is found.
+     * Executes the search algorithm to find a path from an initial state to a goal state.
+     *
+     * @param s    The initial layout.
+     * @param goal The goal layout.
+     * @return An {@link Iterator} for the solution path if found; otherwise, {@code null}.
      */
     public final Iterator<State> solve(Ilayout s, Ilayout goal)
     {
         objective = goal;
-        abertos = createFringe(); // Hook method: subclasses define the fringe type/ordering
+        abertos = createFringe();
         fechados = new HashMap<>();
-        abertos.add(new State(s, null));
+        sequenceCounter = 0;
 
-        while (!abertos.isEmpty())
-        {
+        State initialState = new State(s, null);
+        abertos.add(initialState);
+        fechados.put(initialState.getLayout(), initialState);
+
+        while (!abertos.isEmpty()) {
             actual = abertos.poll();
 
-            if (fechados.containsKey(actual.getLayout())) { // Skip if already processed via a cheaper path
+
+            State currentBest = fechados.get(actual.getLayout());
+            if (actual.getG() > currentBest.getG()) {
+              //  System.err.println("SKIPPING stale node=" + actual.getLayout() + " seq=" + actual.getSequenceId() + " totalG=" + actual.getG() + " (better path exists with G=" + currentBest.getG() + ")");
                 continue;
             }
 
+            //System.err.println("--------------------------------------------------------------------------------------------------------------------");
+            //System.err.println("EXPANDING node=" + actual.getLayout() + " totalG=" + actual.getG() + " seq=" + actual.getSequenceId());
+
             if (actual.getLayout().isGoal(objective)) {
+                //System.err.println("GOAL FOUND!");
                 LinkedList<State> path = new LinkedList<>();
                 State current = actual;
                 while (current != null) {
@@ -144,21 +190,30 @@ public abstract class AbstractSearch
                 return path.iterator();
             }
 
-            fechados.put(actual.getLayout(), actual);
             List<State> sucs = generateSuccessors(actual);
+            int childNum = 0;
+            for (State successor : sucs) {
+                State existing = fechados.get(successor.getLayout());
 
-            for (State successor : sucs)
-                if (!fechados.containsKey(successor.getLayout())) // Only add if not already in closed list
+
+                if (existing == null || successor.getG() < existing.getG())
+                {
+                    fechados.put(successor.getLayout(), successor);
                     abertos.add(successor);
-
+                    //System.err.println("  CHILD#" + childNum + " ADD child= " + successor.getLayout() + " step= " + successor.getLayout().getK() + " totalG= " + successor.getG() + " seq=" + successor.getSequenceId());
+                } //else {
+                  //  System.err.println("  CHILD#" + childNum + " IGNORE = " + successor.getLayout() + " step= " + successor.getLayout().getK() + " totalG= " + successor.getG() + " seq=" + successor.getSequenceId() + " (worse than existing seq=" + existing.getSequenceId() + " existingG=" + existing.getG() + ")");
+                //}
+                childNum++;
+            }
         }
-        return null; // No solution found
+        return null;
     }
 
     /**
-     * The "hook" method that subclasses must implement.
-     * This method defines the search strategy by providing a specific type of queue (fringe).
-     * @return A Queue implementation that dictates the search order.
+     * Factory method for creating the fringe (the "abertos" list).
+     * The data structure returned by this method defines the search strategy.
+     * @return A {@link Queue} instance to be used as the fringe.
      */
     protected abstract Queue<State> createFringe();
 }
