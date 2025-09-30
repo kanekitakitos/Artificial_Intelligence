@@ -5,46 +5,50 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * Represents an 8-puzzle board, implementing the {@link Ilayout} interface.
+ * Represents an immutable state of the 8-puzzle problem.
+ * <p>
+ * This class implements the {@link Ilayout} interface, providing the problem-specific logic
+ * for the 8-puzzle. It is designed to be immutable to ensure that states cannot be
+ * accidentally modified during the search process.
  *
- * @preConditions
- *                 - The constructor must be called with a valid representation of a board.
+ * <h3>Key Implementation Details</h3>
+ * <h4>Immutability</h4>
+ * <p>
+ * Immutability is achieved by making all fields {@code final} and by creating deep copies
+ * of the board state when generating successors in the {@link #children()} method.
+ * </p>
  *
- * @postConditions
- *                  - An immutable `Board` object is created, representing a specific state of the 8-puzzle.
- *                  - The board can generate its children, be compared to a goal, and provide its step cost.
- *
- *                  This class defines the problem-specific logic for the 8-puzzle.
- *                  It stores the board as a 2D integer array, where `0` represents the empty space.
- *                  It provides the necessary methods for a search algorithm like `BestFirst` to navigate the state space.
+ * <h4>State Representation</h4>
+ * <p>
+ * The board is represented as a 3x3 2D integer array. The empty space is represented
+ * by the integer {@code 0}.
+ * </p>
  *
  * @see Ilayout
+ * @see AbstractSearch
  * @see BestFirst
  *
  * @author Brandon Mejia
- * @version 2025-09-07
+ * @version 2025-09-30
  */
 public class Board implements Ilayout {
     private static final int dim = 3;
     private final int[][] board;
 
     /**
-     * Constructs a board from a string representation.
+     * Constructs a board from a compact string representation.
+     * <p>
+     * The input string must be exactly 9 characters long, containing the digits '1' through '8'
+     * and a single '.' character to represent the empty space.
+     * </p>
      *
-     * @preConditions
-     *                 - The input string `str` must have exactly `dim * dim` (9) characters.
-     *                 - The string must contain characters '1' through '8' and one '.' for the empty space.
-     * @postConditions
-     *                  - A new `Board` object is initialized with the specified tile configuration.
-     *                  - The '.' character is converted to `0` to represent the empty space internally.
-     *
-     * @param str The string representing the board layout.
-     * @throws IllegalStateException if the input string does not have a length of 9.
+     * @param str The string representing the board layout (e.g., "12345.786").
+     * @throws IllegalArgumentException if the input string does not have a length of 9.
      */
-    public Board(String str) throws IllegalStateException
+    public Board(String str)
     {
         if (str.length() != dim * dim)
-            throw new IllegalStateException("Invalid arg in core.Board constructor");
+            throw new IllegalArgumentException("Invalid string length for Board constructor. Must be 9.");
 
         board = new int[dim][dim];
         int si = 0;
@@ -59,7 +63,10 @@ public class Board implements Ilayout {
     }
 
     /**
-     * Private constructor for efficient cloning. Creates a deep copy of an existing board.
+     * Private constructor for efficient cloning.
+     * <p>
+     * Creates a deep copy of an existing board state, used internally by the {@link #children()}
+     * method to ensure immutability when creating new successor states.
      *
      * @param existingBoard The 2D array of an existing board to be cloned.
      */
@@ -72,7 +79,9 @@ public class Board implements Ilayout {
 
     /**
      * Returns a string representation of the board for display.
-     * The empty space (0) is represented by a space character.
+     * <p>
+     * The empty space (represented internally as 0) is converted to a space character (' ')
+     * for a more readable, traditional 8-puzzle format.
      *
      * @return A formatted, multi-line string of the board.
      */
@@ -84,15 +93,14 @@ public class Board implements Ilayout {
             for (int j = 0; j < dim; j++) {
                 sb.append(board[i][j] == 0 ? " " : board[i][j]);
             }
-            if (i < dim - 1) {
-                sb.append(System.lineSeparator());
-            }
+            sb.append(System.lineSeparator());
         }
-        return sb.toString() + '\n';
+        return sb.toString();
     }
 
     /**
-     * Gets the cost of a single move, which is always 1.0 for the 8-puzzle problem.
+     * Gets the cost of a single move. For the standard 8-puzzle problem, every
+     * move (sliding a tile) has a uniform cost of 1.
      *
      * @return The constant cost of a move (1.0).
      */
@@ -103,6 +111,8 @@ public class Board implements Ilayout {
 
     /**
      * Checks if this board is the goal state by comparing it to another layout.
+     * This method delegates the comparison to the {@link #equals(Object)} method, which
+     * performs a deep comparison of the board states.
      *
      * @param l The goal layout to compare against.
      * @return `true` if this board is identical to the goal layout, `false` otherwise.
@@ -114,6 +124,9 @@ public class Board implements Ilayout {
 
     /**
      * Generates all valid successor states (children) by moving the empty tile.
+     * <p>
+     * A successor is created for each valid move of the empty tile (up, down, left, or right)
+     * into an adjacent position.
      *
      * @return A list of new `Board` objects representing all possible next states.
      */
@@ -156,6 +169,9 @@ public class Board implements Ilayout {
 
     /**
      * Compares this board with another object for equality.
+     * <p>
+     * Two boards are considered equal if they are both of type {@code Board} and have
+     * the exact same tile configuration in all positions.
      *
      * @param o The object to compare with.
      * @return `true` if the other object is a `Board` with the exact same tile configuration.
@@ -171,6 +187,9 @@ public class Board implements Ilayout {
 
     /**
      * Computes the hash code for this board.
+     * <p>
+     * The hash code is based on the contents of the board's 2D array, ensuring that
+     * two equal boards will have the same hash code, as required for collections like {@link java.util.HashMap}.
      * The hash code is based on the contents of the board's 2D array.
      *
      * @return The hash code for this board.

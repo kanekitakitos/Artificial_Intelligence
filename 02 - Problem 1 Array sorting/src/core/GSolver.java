@@ -2,7 +2,8 @@ package core;
 import java.util.*;
 
 /**
- * Implements a Uniform-Cost Search (UCS) algorithm for the array sorting problem.
+ * Implements a Uniform-Cost Search (UCS) algorithm.
+ * <p>
  * This class extends {@link AbstractSearch} and provides the specific "fringe"
  * implementation required for UCS, which is a priority queue ordered by accumulated cost.
  *
@@ -12,19 +13,19 @@ import java.util.*;
  * @author Brandon Mejia
  * @version 2025-09-27
  */
-public class GSolver extends AbstractSearch
-{
-
+public class GSolver extends AbstractSearch {
+    /**
+     * Creates the fringe (the "abertos" list) for Uniform-Cost Search.
+     *
+     * @return A {@link PriorityQueue} that orders states by their accumulated cost (`g`).
+     * A secondary comparison on the sequence ID is used for tie-breaking, ensuring
+     * a stable, FIFO-like behavior for states with the same cost.
+     */
     @Override
-    protected Queue<State> createFringe() 
-    {
+    protected Queue<State> createFringe() {
+        // Break ties using sequence ID for consistent ordering
         return new PriorityQueue<>(
-                (s1, s2) -> {
-                    int costCompare = Double.compare(s1.getG(), s2.getG());
-                    if (costCompare != 0) return costCompare;
-                    // Break ties using sequence ID for consistent ordering
-                    return Long.compare(s1.getSequenceId(), s2.getSequenceId());
-                }
+                Comparator.comparingDouble(State::getG).thenComparingLong(State::getSequenceId)
         );
     }
 }
