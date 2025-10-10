@@ -48,7 +48,8 @@ public final class ArrayCfg implements Ilayout {
      * @param s The input string (e.g., "9 7 8").
      * @throws IllegalArgumentException if the input string is null or empty.
      */
-    public ArrayCfg(String s) {
+    public ArrayCfg(String s)
+    {
         if (s == null || s.trim().isEmpty()) {
             throw new IllegalArgumentException("Input string cannot be null or empty.");
         }

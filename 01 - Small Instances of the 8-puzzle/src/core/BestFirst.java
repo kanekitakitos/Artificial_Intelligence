@@ -84,7 +84,8 @@ public class BestFirst
                 // Solution found! Reconstruct the solution path.
                 LinkedList<State> path = new LinkedList<>();
                 State current = actual;
-                while (current != null) {
+                while (current != null)
+                {
                     path.addFirst(current);// funciona como stack, só que melhor O(1) em adicionar ao inicio
                     current = current.getFather();
                 }

@@ -22,7 +22,8 @@ public class GSolver extends AbstractSearch {
      * a stable, FIFO-like behavior for states with the same cost.
      */
     @Override
-    protected Queue<State> createFringe() {
+    protected Queue<State> createFringe()
+    {
         // Break ties using sequence ID for consistent ordering
         return new PriorityQueue<>(
                 Comparator.comparingDouble(State::getG).thenComparingLong(State::getSequenceId)

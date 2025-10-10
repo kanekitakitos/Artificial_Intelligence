@@ -73,7 +73,8 @@ import java.util.*;
  * @author Brandon Mejia
  * @version 2025-09-30
  */
-public abstract class AbstractSearch {
+public abstract class AbstractSearch
+{
     protected Queue<State> abertos;
     protected Map<Ilayout, State> fechados; // Using this map to track the best state found for a layout
     protected State actual;
@@ -139,7 +140,8 @@ public abstract class AbstractSearch {
      * @param n The state to expand.
      * @return A list of successor states.
      */
-    protected final List<State> generateSuccessors(State n) {
+    protected final List<State> generateSuccessors(State n)
+    {
         List<State> sucs = new ArrayList<>();
         List<Ilayout> children = n.layout.children();
         for (Ilayout e : children) {
@@ -166,12 +168,14 @@ public abstract class AbstractSearch {
         abertos.add(initialState);
         fechados.put(initialState.getLayout(), initialState);
 
-        while (!abertos.isEmpty()) {
+        while (!abertos.isEmpty())
+        {
             actual = abertos.poll();
 
 
             State currentBest = fechados.get(actual.getLayout());
-            if (actual.getG() > currentBest.getG()) {
+            if (actual.getG() > currentBest.getG())
+            {
               //  System.err.println("SKIPPING stale node=" + actual.getLayout() + " seq=" + actual.getSequenceId() + " totalG=" + actual.getG() + " (better path exists with G=" + currentBest.getG() + ")");
                 continue;
             }

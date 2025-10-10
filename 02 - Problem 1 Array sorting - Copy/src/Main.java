@@ -41,15 +41,17 @@ public class Main {
         GSolver gs = new GSolver();
         Iterator<GSolver.State> it =
                 gs.solve( new ArrayCfg(sc.nextLine()), new ArrayCfg(sc.nextLine()));
+        
         if (it==null) System.out.println("no solution found");
         else {
-            // Iterate through the solution path to find the final state
-            GSolver.State finalState = null;
+            // Itera sobre o caminho da solução para imprimir cada passo
             while(it.hasNext()) {
-                finalState = it.next();
+                GSolver.State i = it.next();
+                System.out.println(i); // Imprime o estado atual (o layout)
+
+                // Se for o último estado, imprime o custo total
+                if (!it.hasNext()) System.out.println((int)i.getK());
             }
-            // Print only the cost of the final state
-            if (finalState != null) System.out.println((int)finalState.getK());
         }
         sc.close();
 
