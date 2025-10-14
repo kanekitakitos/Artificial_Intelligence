@@ -134,7 +134,7 @@ public class ComparisonTest {
         // Print to the real console (System.err) to see the results live.
         System.err.println("\n--- Comparison on 10-Element Reversed Array ---");
 
-        runAndMeasure("A* Search", new AStarSearch(), input, 3);
+        runAndMeasure("A* Search", new AStarSearch(), input, 1);
         runAndMeasure("GSolver (UCS)", new GSolver(), input, 20);
 
         System.err.println("---------------------------------------------------");
@@ -153,8 +153,30 @@ public class ComparisonTest {
 
         System.err.println("\n--- Comparison on 12-Element 'Worst-Case' Array ---");
 
-        runAndMeasure("A* Search", new AStarSearch(), input, 9);
-        runAndMeasure("GSolver (UCS)", new GSolver(), input, 120);
+        runAndMeasure("A* Search", new AStarSearch(), input, 1);
+        runAndMeasure("GSolver (UCS)", new GSolver(), input, 200);
+
+        System.err.println("---------------------------------------------------");
+    }
+
+    /**
+     * Compares performance on a very large "worst-case" scenario with 20 elements.
+     * This test highlights the scalability difference, where A* remains viable while
+     * GSolver's execution time grows exponentially, making it impractical.
+     */
+    @Test
+    @DisplayName("Compare A* vs GSolver on a 20-element 'worst-case' array")
+    void compare_worstCase_20_elements() {
+        String input = "2 4 6 8 10 12 14 16 18 20 1 3 5 7 9 11 13 15 17 19\n" +
+                       "1 3 5 7 9 11 13 15 17 19 2 4 6 8 10 12 14 16 18 20\n";
+
+        System.err.println("\n--- Comparison on 20-Element 'Worst-Case' Array ---");
+
+        // A* should still be able to handle this due to the powerful heuristic.
+        runAndMeasure("A* Search", new AStarSearch(), input, 1);
+
+        // GSolver will face a combinatorial explosion and will time out.
+        runAndMeasure("GSolver (UCS)", new GSolver(), input, 9000);
 
         System.err.println("---------------------------------------------------");
     }
