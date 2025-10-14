@@ -3,6 +3,7 @@ import core.ArrayCfg;
 import core.BestFirst;
 import core.Board;
 import core.GSolver;
+import core.AStarSearch;
 import java.util.Iterator;
 import java.util.Scanner;
 
@@ -20,12 +21,35 @@ import java.util.Scanner;
 public class Main {
     public static void main (String [] args)
     {
-        boolean gSolve = true;
+        boolean gSolve = false;
 
         if(gSolve)
             GSolve();
         else
-            bestFirst();
+            AStarSearch();
+            //bestFirst();
+    }
+
+    public static void AStarSearch()
+    {
+        Scanner sc = new Scanner(System.in);
+        AStarSearch gs = new AStarSearch();
+        Iterator<AStarSearch.State> it =
+                gs.solve( new ArrayCfg(sc.nextLine()), new ArrayCfg(sc.nextLine()));
+
+        if (it==null) System.out.println("no solution found");
+        else {
+
+            while(it.hasNext()) {
+                AStarSearch.State i = it.next();
+                //System.out.println(i); // Imprime o estado atual (o layout)
+
+                // Se for o último estado, imprime o custo total
+                if (!it.hasNext()) System.out.println((int)i.getG());
+            }
+        }
+        sc.close();
+
     }
 
     /**
@@ -41,7 +65,7 @@ public class Main {
         GSolver gs = new GSolver();
         Iterator<GSolver.State> it =
                 gs.solve( new ArrayCfg(sc.nextLine()), new ArrayCfg(sc.nextLine()));
-        
+
         if (it==null) System.out.println("no solution found");
         else {
             // Itera sobre o caminho da solução para imprimir cada passo
@@ -50,7 +74,7 @@ public class Main {
                 //System.out.println(i); // Imprime o estado atual (o layout)
 
                 // Se for o último estado, imprime o custo total
-                if (!it.hasNext()) System.out.println((int)i.getK());
+                if (!it.hasNext()) System.out.println((int)i.getG());
             }
         }
         sc.close();

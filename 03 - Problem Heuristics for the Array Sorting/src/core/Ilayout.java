@@ -60,6 +60,15 @@ public interface Ilayout
     double getK();
 
     /**
+     * Calculates the heuristic estimate of the cost from this state to the goal.
+     * This is the `h(n)` function in algorithms like A*.
+     *
+     * @param goal The goal layout.
+     * @return The estimated cost to reach the goal.
+     */
+    double getH(Ilayout goal);
+
+    /**
      * Provides a string representation of the layout.
      * <p>
      * This method is essential for displaying the state in the solution output and for debugging.

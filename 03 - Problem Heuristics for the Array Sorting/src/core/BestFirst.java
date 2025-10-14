@@ -22,7 +22,7 @@ import java.util.*;
  * modified to include a heuristic function `h(n)`. For example:
  * </p>
  * <pre>{@code
- * Comparator<State> comparator = Comparator.comparingDouble(s -> s.getG() + s.getH());
+ * Comparator<State> comparator = Comparator.comparingDouble((State s) -> s.getG() + s.getH());
  * return new PriorityQueue<>(comparator);
  * }</pre>
  *

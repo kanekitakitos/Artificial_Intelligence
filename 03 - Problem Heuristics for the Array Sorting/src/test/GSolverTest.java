@@ -51,7 +51,7 @@ public class GSolverTest {
                 finalState = it.next();
             }
             // Print only the cost of the final state
-            if (finalState != null) System.out.println((int)finalState.getK());
+            if (finalState != null) System.out.println((int)finalState.getG());
         }
         sc.close();
     }

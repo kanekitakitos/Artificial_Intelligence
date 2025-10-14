@@ -90,20 +90,24 @@ public abstract class AbstractSearch
         private final Ilayout layout;
         private final State father;
         private final double g; // Cost from start to current state
+        private final double h; // Heuristic cost from current state to goal
         private final long sequenceId;
 
         /**
          * Constructs a new State.
          * <p>
          * The accumulated cost `g` is calculated based on the parent's cost plus the
-         * cost of the step leading to this state. The initial state has a cost of 0.
+         * cost of the step leading to this state. The heuristic cost `h` is calculated
+         * by the layout itself.
          * @param l The layout of this state.
          * @param n The parent state (null for the initial state).
+         * @param goal The goal layout, needed to calculate the heuristic.
          */
-        public State(Ilayout l, State n) {
+        public State(Ilayout l, State n, Ilayout goal) {
             layout = l;
             father = n;
             sequenceId = AbstractSearch.sequenceCounter++;
+            h = layout.getH(goal); // Calculate heuristic
 
             if (father != null) {
                 g = father.g + layout.getK();
@@ -117,8 +121,8 @@ public abstract class AbstractSearch
             return layout.toString();
         }
 
-        public double getK() { return g; }
         public double getG() { return g; }
+        public double getH() { return h; }
         public long getSequenceId() { return sequenceId; }
         public Ilayout getLayout() { return layout; }
         public State getFather() { return father; }
@@ -145,7 +149,7 @@ public abstract class AbstractSearch
         List<State> sucs = new ArrayList<>();
         List<Ilayout> children = n.layout.children();
         for (Ilayout e : children) {
-            sucs.add(new State(e, n));
+            sucs.add(new State(e, n, this.objective));
         }
         return sucs;
     }
@@ -164,7 +168,7 @@ public abstract class AbstractSearch
         fechados = new HashMap<>();
         sequenceCounter = 0;
 
-        State initialState = new State(s, null);
+        State initialState = new State(s, null, goal);
         abertos.add(initialState);
         fechados.put(initialState.getLayout(), initialState);
 

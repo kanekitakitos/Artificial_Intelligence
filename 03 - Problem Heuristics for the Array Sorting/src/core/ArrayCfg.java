@@ -163,6 +163,45 @@ public final class ArrayCfg implements Ilayout {
     }
 
     /**
+     * Calculates the heuristic value (h) for the A* algorithm.
+     * <p>
+     * This heuristic provides a more informed (and thus stronger) estimate than simply counting
+     * misplaced elements. It calculates the minimum potential cost to move each misplaced element
+     * individually and sums these costs, then divides by two (since each swap moves two elements).
+     * <ul>
+     *     <li>For a misplaced <b>even</b> number, the cheapest move is swapping it with another even number (cost 2).</li>
+     *     <li>For a misplaced <b>odd</b> number, the cheapest move is swapping it with an even number (cost 11).</li>
+     * </ul>
+     * This heuristic remains admissible because it is based on the lowest possible cost for each
+     * action, ensuring it never overestimates the true cost to the goal.
+     *
+     * @param goal The goal layout to compare against.
+     * @return The estimated cost to reach the goal.
+     */
+    @Override
+    public double getH(Ilayout goal) {
+        if (!(goal instanceof ArrayCfg)) return Double.POSITIVE_INFINITY;
+
+        ArrayCfg goalCfg = (ArrayCfg) goal;
+        double estimatedCost = 0;
+
+        for (int i = 0; i < data.length; i++) {
+            if (data[i] != goalCfg.data[i]) {
+                // This element is misplaced. Estimate the minimum cost to move it based on its parity.
+                if (data[i] % 2 == 0) { // If the element is even
+                    estimatedCost += 2; // Cheapest swap is with another even (cost 2)
+                } else { // If the element is odd
+                    estimatedCost += 11; // Cheapest swap is with an even (cost 11)
+                }
+            }
+        }
+
+        // Each swap corrects two positions, so we divide the total estimated cost by 2.
+        // This ensures the heuristic remains admissible.
+        return estimatedCost / 2.0;
+    }
+
+    /**
      * Returns a string representation of the layout.
      * The integers are separated by a single space.
      *

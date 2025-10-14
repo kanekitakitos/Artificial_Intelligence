@@ -109,6 +109,11 @@ public class Board implements Ilayout {
         return 1.0;
     }
 
+    @Override
+    public double getH(Ilayout goal) {
+        return 0;
+    }
+
     /**
      * Checks if this board is the goal state by comparing it to another layout.
      * This method delegates the comparison to the {@link #equals(Object)} method, which
