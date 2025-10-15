@@ -232,216 +232,212 @@ public final class ArrayCfg implements Ilayout {
 
 
     /**
-     * A private, static helper class that encapsulates the entire heuristic calculation.
+ * A private, static helper class that encapsulates the entire heuristic calculation.
+ * <p>
+ * It is implemented as a stateless calculator using a sophisticated hybrid strategy based on
+ * <b>permutation cycle decomposition</b>. This provides a very tight lower-bound estimate of the
+ * true cost, making the A* search extremely efficient.
+ *
+ * @see #compute()
+ */
+private static final class Heuristic {
+    private final int[] data;
+    private final int[] goal;
+
+    Heuristic(int[] data, int[] goal) {
+        this.data = data;
+        this.goal = goal;
+    }
+
+    /**
+     * Computes the heuristic value by decomposing the permutation into cycles and estimating the cost.
      * <p>
-     * It is implemented as a stateless calculator using a sophisticated hybrid strategy based on
-     * <b>permutation cycle decomposition</b>. This provides a very tight lower-bound estimate of the
-     * true cost, making the A* search extremely efficient.
-     *
-     * @see #compute()
+     * The calculation involves these steps:
+     * </p>
+     * <ol>
+     * <li><b>Mapping:</b> It first determines the target position for each element.</li>
+     * <li><b>Cycle Decomposition:</b> The permutation is broken down into disjoint cycles.</li>
+     * <li><b>Hybrid Cost Calculation:</b> The cost for resolving each cycle is estimated based on its size:
+     * <ul>
+     * <li><b>2-Cycles:</b> The exact cost of the single swap is calculated.</li>
+     * <li><b>Small Cycles (3-5 elements):</b> A brute-force search finds the true optimal cost.</li>
+     * <li><b>Large Cycles (>5 elements):</b> A fast, admissible greedy estimation is used.</li>
+     * </ul>
+     * </li>
+     * </ol>
+     * <p>
+     * This heuristic is <b>admissible</b> because it never overestimates the true cost.
+     * </p>
+     * <ul>
+     * <li><b>Time Complexity:</b> O(n)</li>
+     * <li><b>Space Complexity:</b> O(n)</li>
+     * </ul>
      */
-    private static final class Heuristic
-    {
-        private final int[] data;
-        private final int[] goal;
+    double compute() {
+        int n = data.length;
 
-        Heuristic(int[] data, int[] goal) {
-            this.data = data;
-            this.goal = goal;
+        // 1) build posMap (goal value -> queue of positions)
+        Map<Integer, ArrayDeque<Integer>> posMap = new HashMap<>(n * 2);
+        for (int j = 0; j < n; j++) posMap.computeIfAbsent(goal[j], k -> new ArrayDeque<>()).addLast(j);
+
+        // 2) build targetIndex (if multisets differ, return +inf)
+        int[] targetIndex = new int[n];
+        for (int i = 0; i < n; i++) {
+            ArrayDeque<Integer> q = posMap.get(data[i]);
+            if (q == null || q.isEmpty()) return Double.POSITIVE_INFINITY;
+            targetIndex[i] = q.removeFirst();
         }
 
-        /**
-         * Computes the heuristic value by decomposing the permutation into cycles and estimating the cost.
-         * <p>
-         * The calculation involves these steps:
-         * </p>
-         * <ol>
-         *   <li><b>Mapping:</b> It first determines the target position for each element.</li>
-         *   <li><b>Cycle Decomposition:</b> The permutation is broken down into disjoint cycles.</li>
-         *   <li><b>Hybrid Cost Calculation:</b> The cost for resolving each cycle is estimated based on its size:
-         *     <ul>
-         *       <li><b>2-Cycles:</b> The exact cost of the single swap is calculated.</li>
-         *       <li><b>Small Cycles (3-5 elements):</b> A brute-force search finds the true optimal cost.</li>
-         *       <li><b>Large Cycles (>5 elements):</b> A fast, admissible greedy estimation is used.</li>
-         *     </ul>
-         *   </li>
-         * </ol>
-         * <p>
-         * This heuristic is <b>admissible</b> because it never overestimates the true cost.
-         * </p>
-         * <ul>
-         *   <li><b>Time Complexity:</b> O(n)</li>
-         *   <li><b>Space Complexity:</b> O(n)</li>
-         * </ul>
-         */
-        double compute() {
-            int n = data.length;
+        // 3) process cycles
+        boolean[] visited = new boolean[n];
+        double heuristic = 0.0;
 
-            // 1) build posMap (goal value -> queue of positions)
-            Map<Integer, ArrayDeque<Integer>> posMap = new HashMap<>(n * 2);
-            for (int j = 0; j < n; j++) posMap.computeIfAbsent(goal[j], k -> new ArrayDeque<>()).addLast(j);
+        int totalSwapsNeededFallback = 0;
+        int evenRemFallback = 0;
+        int oddRemFallback = 0;
 
-            // 2) build targetIndex (if multisets differ, return +inf)
-            int[] targetIndex = new int[n];
-            for (int i = 0; i < n; i++) {
-                ArrayDeque<Integer> q = posMap.get(data[i]);
-                if (q == null || q.isEmpty()) return Double.POSITIVE_INFINITY;
-                targetIndex[i] = q.removeFirst();
+        for (int i = 0; i < n; i++) {
+            if (visited[i] || targetIndex[i] == i) {
+                visited[i] = true;
+                continue;
             }
 
-            // 3) process cycles
-            boolean[] visited = new boolean[n];
-            double heuristic = 0.0;
+            int cur = i;
+            ArrayList<Integer> cycleVals = new ArrayList<>();
+            ArrayList<Integer> cycleGoalVals = new ArrayList<>();
 
-            int totalSwapsNeededFallback = 0;
-            int evenRemFallback = 0;
-            int oddRemFallback = 0;
+            while (!visited[cur]) {
+                visited[cur] = true;
+                cycleVals.add(data[cur]);
+                cycleGoalVals.add(goal[cur]);
+                cur = targetIndex[cur];
+            }
 
-            for (int i = 0; i < n; i++) {
-                if (visited[i] || targetIndex[i] == i) {
-                    visited[i] = true;
-                    continue;
+            int k = cycleVals.size();
+            if (k <= 1) continue;
+
+            if (k == 2) {
+                heuristic += calculateCost(cycleVals.get(0), cycleVals.get(1));
+            } else if (k <= 5) {
+                heuristic += costForSmallCycle(cycleVals, cycleGoalVals);
+            } else {
+                int evenCount = 0, oddCount = 0;
+                for (int v : cycleVals) {
+                    boolean ev = (v == 0) || ((v & 1) == 0);
+                    if (ev) evenCount++; else oddCount++;
                 }
+                totalSwapsNeededFallback += (k - 1);
+                evenRemFallback += evenCount;
+                oddRemFallback += oddCount;
+            }
+        }
 
-                int cur = i;
-                ArrayList<Integer> cycleVals = new ArrayList<>();
-                ArrayList<Integer> cycleGoalVals = new ArrayList<>();
+        // 4) apply greedy fallback for aggregated large cycles
+        heuristic += greedyCostForFallback(totalSwapsNeededFallback, evenRemFallback, oddRemFallback);
+        return heuristic;
+    }
 
-                while (!visited[cur]) {
-                    visited[cur] = true;
-                    cycleVals.add(data[cur]);
-                    cycleGoalVals.add(goal[cur]);
-                    cur = targetIndex[cur];
-                }
+    /**
+     * [OPTIMIZED VERSION]
+     * Finds the minimal cost to resolve a small cycle by brute-forcing all valid swap sequences.
+     * This version is optimized to avoid memory allocation inside the main simulation loop.
+     */
+    private static double costForSmallCycle(List<Integer> cycleVals, List<Integer> cycleGoalVals) {
+        final int k = cycleVals.size();
+        ArrayList<int[]> pairList = new ArrayList<>();
+        for (int a = 0; a < k - 1; a++) {
+            for (int b = a + 1; b < k; b++) {
+                pairList.add(new int[]{a, b});
+            }
+        }
 
-                int k = cycleVals.size();
-                if (k <= 1) continue;
+        int steps = k - 1;
+        int base = pairList.size();
+        long sequences = 1;
+        for (int s = 0; s < steps; s++) sequences *= base;
 
-                if (k == 2) {
-                    heuristic += calculateCost(cycleVals.get(0), cycleVals.get(1));
-                } else if (k <= 5) {
-                    heuristic += costForSmallCycle(cycleVals, cycleGoalVals);
-                } else {
-                    int evenCount = 0, oddCount = 0;
-                    for (int v : cycleVals) {
-                        boolean ev = (v == 0) || ((v & 1) == 0);
-                        if (ev) evenCount++; else oddCount++;
+        double bestCost = Double.POSITIVE_INFINITY;
+        int[] idx = new int[steps];
+
+        // OPTIMIZATION: Allocate the simulation array only ONCE before the loop.
+        int[] curVals = new int[k];
+        int[] initialCycleVals = cycleVals.stream().mapToInt(i -> i).toArray();
+
+        outer:
+        for (long seq = 0; seq < sequences; seq++) {
+            // OPTIMIZATION: Instead of creating a new array, reset the existing one.
+            System.arraycopy(initialCycleVals, 0, curVals, 0, k);
+
+            double costSum = 0.0;
+            for (int step = 0; step < steps; step++) {
+                int pairIndex = idx[step];
+                int p = pairList.get(pairIndex)[0];
+                int q = pairList.get(pairIndex)[1];
+                int va = curVals[p], vb = curVals[q];
+                costSum += ArrayCfg.calculateCost(va, vb);
+
+                int tmp = curVals[p]; curVals[p] = curVals[q]; curVals[q] = tmp;
+
+                if (costSum >= bestCost) {
+                    // Pruning: advance index and skip to the next sequence
+                    for (int pidx = steps - 1; pidx >= 0; pidx--) {
+                        idx[pidx]++;
+                        if (idx[pidx] < base) break;
+                        idx[pidx] = 0;
                     }
-                    totalSwapsNeededFallback += (k - 1);
-                    evenRemFallback += evenCount;
-                    oddRemFallback += oddCount;
+                    continue outer;
                 }
             }
 
-            // 4) apply greedy fallback for aggregated large cycles
-            heuristic += greedyCostForFallback(totalSwapsNeededFallback, evenRemFallback, oddRemFallback);
-            return heuristic;
+            // Check if this sequence is a valid solution
+            boolean matches = true;
+            for (int t = 0; t < k; t++) {
+                if (curVals[t] != cycleGoalVals.get(t)) {
+                    matches = false;
+                    break;
+                }
+            }
+            if (matches && costSum < bestCost) {
+                bestCost = costSum;
+            }
+
+            // Manually increment index to get the next permutation of swaps
+            for (int pidx = steps - 1; pidx >= 0; pidx--) {
+                idx[pidx]++;
+                if (idx[pidx] < base) break;
+                idx[pidx] = 0;
+            }
         }
 
-        /**
-         * Finds the minimal cost to resolve a small cycle by brute-forcing all valid swap sequences.
-         * A sequence is valid if it consists of exactly (k-1) swaps and sorts the cycle.
-         * Assumes k is in [3..5]. Uses pruning to discard non-optimal paths early.
-         */
-        private static double costForSmallCycle(List<Integer> cycleVals, List<Integer> cycleGoalVals) {
-            final int k = cycleVals.size();
-            // build pair list of unordered index pairs
-            ArrayList<int[]> pairList = new ArrayList<>();
-            for (int a = 0; a < k - 1; a++) {
-                for (int b = a + 1; b < k; b++) {
-                    pairList.add(new int[]{a, b});
-                }
-            }
-
-            int steps = k - 1;
-            int base = pairList.size();
-            long sequences = 1;
-            for (int s = 0; s < steps; s++) sequences *= base; // <= 10_000 for k=5
-
-            double bestCost = Double.POSITIVE_INFINITY;
-            int[] idx = new int[steps];
-
-            outer:
-            for (long seq = 0; seq < sequences; seq++) {
-                int[] curVals = new int[k];
-                for (int t = 0; t < k; t++) curVals[t] = cycleVals.get(t);
-
-                double costSum = 0.0;
-                for (int step = 0; step < steps; step++) {
-                    int pairIndex = idx[step];
-                    int p = pairList.get(pairIndex)[0];
-                    int q = pairList.get(pairIndex)[1];
-
-                    int va = curVals[p], vb = curVals[q];
-                    costSum += calculateCost(va, vb);
-
-                    // swap
-                    int tmp = curVals[p]; curVals[p] = curVals[q]; curVals[q] = tmp;
-
-                    if (costSum >= bestCost) {
-                        // increment index and continue outer loop (prune)
-                        for (int pidx = steps - 1; pidx >= 0; pidx--) {
-                            idx[pidx]++;
-                            if (idx[pidx] < base) break;
-                            idx[pidx] = 0;
-                        }
-                        continue outer;
-                    }
-                }
-
-                // check match
-                boolean matches = true;
-                for (int t = 0; t < k; t++) {
-                    if (curVals[t] != cycleGoalVals.get(t)) { matches = false; break; }
-                }
-                if (matches && costSum < bestCost) bestCost = costSum;
-
-                // increment index
-                for (int pidx = steps - 1; pidx >= 0; pidx--) {
-                    idx[pidx]++;
-                    if (idx[pidx] < base) break;
-                    idx[pidx] = 0;
-                }
-            }
-
-            if (bestCost == Double.POSITIVE_INFINITY) {
-                // fallback greedy pairing (very rare)
-                int even = 0, odd = 0;
-                for (int v : cycleVals) { if ((v == 0) || ((v & 1) == 0)) even++; else odd++; }
-                int swapsNeeded = k - 1;
-                double sum = 0;
-                for (int s = 0; s < swapsNeeded; s++) {
-                    if (even >= 2) { sum += 2; even -= 2; }
-                    else if (even >= 1 && odd >= 1) { sum += 11; even -= 1; odd -= 1; }
-                    else if (odd >= 2) { sum += 20; odd -= 2; }
-                    else break;
-                }
-                return sum;
-            }
-
-            return bestCost;
+        if (bestCost == Double.POSITIVE_INFINITY) {
+            // Fallback for the rare case no solution is found (shouldn't happen)
+            return greedyCostForFallback(k - 1,
+                    (int) cycleVals.stream().filter(v -> (v & 1) == 0).count(),
+                    (int) cycleVals.stream().filter(v -> (v & 1) != 0).count());
         }
 
-        /**
-         * Estimates the cost for large cycles using a greedy approach.
-         * It repeatedly simulates the cheapest possible swap (even-even, then mixed, then odd-odd)
-         * based on the available counts of even and odd numbers.
-         */
-        private static double greedyCostForFallback(int swapsNeeded, int evenCount, int oddCount) {
-            double cost = 0.0;
-            for (int s = 0; s < swapsNeeded; s++) {
-                if (evenCount >= 2) {
-                    cost += 2; evenCount -= 2;
-                } else if (evenCount >= 1 && oddCount >= 1) {
-                    cost += 11; evenCount -= 1; oddCount -= 1;
-                } else if (oddCount >= 2) {
-                    cost += 20; oddCount -= 2;
-                } else {
-                    break; // conservative
-                }
+        return bestCost;
+    }
+
+    /**
+     * Estimates the cost for large cycles using a greedy approach.
+     */
+    private static double greedyCostForFallback(int swapsNeeded, int evenCount, int oddCount) {
+        double cost = 0.0;
+        for (int s = 0; s < swapsNeeded; s++) {
+            if (evenCount >= 2) {
+                cost += 2; evenCount -= 2;
+            } else if (evenCount >= 1 && oddCount >= 1) {
+                cost += 11; evenCount -= 1; oddCount -= 1;
+            } else if (oddCount >= 2) {
+                cost += 20; oddCount -= 2;
+            } else {
+                break;
             }
-            return cost;
         }
-    } 
+        return cost;
+    }
+
+}
 
 }

@@ -335,4 +335,40 @@ public class AStarSearchTest {
         double durationS = durationMs / 1000.0;
         System.err.printf("  [PERF] %s execution time: %.3f s (%.3f ms)%n", testName, durationS, durationMs);
     }
+
+
+
+    /**
+     * A highly complex test case designed to stress the heuristic by combining multiple disjoint cycles
+     * of different sizes and parity compositions. This tests the heuristic's ability to correctly
+     * calculate the optimal cost for small cycles (k=3, k=4, k=5) and sum them up.
+     * <p>
+     * The permutation consists of:
+     * <ul>
+     * <li>A 5-cycle of only odd numbers (positions 0,2,4,6,8). The optimal path requires 4 swaps, all odd-odd, costing 4 * 20 = 80.</li>
+     * <li>A 4-cycle of only even numbers (positions 1,3,5,7). The optimal path requires 3 swaps, all even-even, costing 3 * 2 = 6.</li>
+     * <li>A 3-cycle of mixed parity (positions 9,10,11). The optimal path requires 2 swaps, one even-even and one even-odd, costing 2 + 11 = 13.</li>
+     * <li>One fixed point (13).</li>
+     * </ul>
+     * The total optimal cost is the sum of the costs for each independent cycle: 80 + 6 + 13 = 99.
+     * </p>
+     */
+//    @Test
+//    @DisplayName("Performance: 13-element array with multiple complex cycles")
+//    void testMultipleDisjointCycles_performance() throws Exception {
+//        // Arrange
+//        String input = "9 8 1 2 3 4 5 6 7 12 10 11 13\n1 2 3 4 5 6 7 8 9 10 11 12 13\n";
+//        String expectedOutput = "99" + System.lineSeparator();
+//
+//        // Act
+//        long startTime = System.nanoTime();
+//        runAppWithInput(input);
+//        long endTime = System.nanoTime();
+//
+//        // Assert
+//        assertEquals(expectedOutput, outContent.toString(), "The output for the multi-cycle array should be correct.");
+//
+//        // Report time
+//        reportTime(startTime, endTime, "testMultipleDisjointCycles_performance");
+//    }
 }
