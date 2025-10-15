@@ -338,9 +338,8 @@ private static final class Heuristic {
     }
 
     /**
-     * [OPTIMIZED VERSION]
+     *
      * Finds the minimal cost to resolve a small cycle by brute-forcing all valid swap sequences.
-     * This version is optimized to avoid memory allocation inside the main simulation loop.
      */
     private static double costForSmallCycle(List<Integer> cycleVals, List<Integer> cycleGoalVals) {
         final int k = cycleVals.size();
