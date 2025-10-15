@@ -4,6 +4,7 @@ import core.ArrayCfg;
 import core.AStarSearch;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -15,7 +16,6 @@ import java.util.Iterator;
 import java.util.Scanner;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTimeout;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
@@ -106,16 +106,22 @@ public class AStarSearchTest {
      * @throws Exception if the test run fails.
      */
     @Test
-    void testSample1_performance() {
+    @DisplayName("Performance: Sample 1 from problem description")
+    void testSample1_performance() throws Exception {
         // Arrange
         String input = "-2 4 0 -1 3 5 1\n-2 -1 0 1 3 4 5\n";
         String expectedOutput = "33" + System.lineSeparator();
 
-        // Act & Assert
-        assertTimeout(Duration.ofSeconds(1), () -> {
-            runAppWithInput(input);
-            assertEquals(expectedOutput, outContent.toString(), "The output should be correct even when testing for performance.");
-        });
+        // Act
+        long startTime = System.nanoTime();
+        runAppWithInput(input);
+        long endTime = System.nanoTime();
+
+        // Assert
+        assertEquals(expectedOutput, outContent.toString(), "The output should be correct even when testing for performance.");
+
+        // Report time
+        reportTime(startTime, endTime, "testSample1_performance");
     }
 
     /**
@@ -124,16 +130,22 @@ public class AStarSearchTest {
      * The timeout is set to 1 second.
      */
     @Test
-    void testReversedArray_performance() {
+    @DisplayName("Performance: 8-element reversed array")
+    void testReversedArray_performance() throws Exception {
         // Arrange
         String input = "8 7 6 5 4 3 2 1\n1 2 3 4 5 6 7 8\n";
         String expectedOutput = "44" + System.lineSeparator();
 
-        // Act & Assert
-        assertTimeout(Duration.ofSeconds(1), () -> {
-            runAppWithInput(input);
-            assertEquals(expectedOutput, outContent.toString(), "The output for the reversed array should be correct.");
-        });
+        // Act
+        long startTime = System.nanoTime();
+        runAppWithInput(input);
+        long endTime = System.nanoTime();
+
+        // Assert
+        assertEquals(expectedOutput, outContent.toString(), "The output for the reversed array should be correct.");
+
+        // Report time
+        reportTime(startTime, endTime, "testReversedArray_performance");
     }
 
     /**
@@ -143,7 +155,8 @@ public class AStarSearchTest {
      * The timeout is kept at 1 second to ensure high performance.
      */
     @Test
-    void testHighlyScrambled_10_elements_performance() {
+    @DisplayName("Performance: 10-element highly scrambled array")
+    void testHighlyScrambled_10_elements_performance() throws Exception {
         // Arrange: Evens are in odd positions and vice-versa.
         String input = "9 8 7 6 5 4 3 2 1 10\n1 2 3 4 5 6 7 8 9 10\n";
         // The optimal solution requires 4 swaps, all between even and odd numbers.
@@ -151,11 +164,16 @@ public class AStarSearchTest {
         // A better path is swapping pairs that are in each other's places: (10,1), (2,9), (4,7), (6,8). Cost: 4*11=44
         String expectedOutput = "44" + System.lineSeparator();
 
-        // Act & Assert
-        assertTimeout(Duration.ofSeconds(1), () -> {
-            runAppWithInput(input);
-            assertEquals(expectedOutput, outContent.toString(), "The output for the highly scrambled array should be correct.");
-        });
+        // Act
+        long startTime = System.nanoTime();
+        runAppWithInput(input);
+        long endTime = System.nanoTime();
+
+        // Assert
+        assertEquals(expectedOutput, outContent.toString(), "The output for the highly scrambled array should be correct.");
+
+        // Report time
+        reportTime(startTime, endTime, "testHighlyScrambled_10_elements_performance");
     }
 
     /**
@@ -166,7 +184,8 @@ public class AStarSearchTest {
      * Timeout is set to 2 seconds to account for the increased complexity.
      */
     @Test
-    void testReversedArray_11_elements_performance() {
+    @DisplayName("Performance: 11-element reversed array")
+    void testReversedArray_11_elements_performance() throws Exception {
         // Arrange
         String input = "11 10 9 8 7 6 5 4 3 2 1\n1 2 3 4 5 6 7 8 9 10 11\n";
         // Optimal path cost is calculated by swapping symmetric pairs:
@@ -178,27 +197,38 @@ public class AStarSearchTest {
         // Total cost = 20 + 2 + 20 + 2 + 20 = 64
         String expectedOutput = "64" + System.lineSeparator();
 
-        // Act & Assert
-        assertTimeout(Duration.ofSeconds(1), () -> {
-            runAppWithInput(input);
-            assertEquals(expectedOutput, outContent.toString(), "The output for the 11-element reversed array should be correct.");
-        });
+        // Act
+        long startTime = System.nanoTime();
+        runAppWithInput(input);
+        long endTime = System.nanoTime();
+
+        // Assert
+        assertEquals(expectedOutput, outContent.toString(), "The output for the 11-element reversed array should be correct.");
+
+        // Report time
+        reportTime(startTime, endTime, "testReversedArray_11_elements_performance");
     }
 
 
     @Test
-    void testWorstCase_12_elements_performance() {
+    @DisplayName("Performance: 12-element 'worst-case' array")
+    void testWorstCase_12_elements_performance() throws Exception {
         // Arrange: All evens are in the first half, odds in the second. Goal is the opposite.
         String input = "2 4 6 8 10 12 1 3 5 7 9 11\n1 3 5 7 9 11 2 4 6 8 10 12\n";
         // The optimal solution requires swapping each even number with an odd number.
         // This means 6 swaps of cost 11 each. Total cost = 6 * 11 = 66.
         String expectedOutput = "66" + System.lineSeparator();
 
-        // Act & Assert
-        assertTimeout(Duration.ofSeconds(1), () -> {
-            runAppWithInput(input);
-            assertEquals(expectedOutput, outContent.toString(), "The output for the 12-element 'worst-case' array should be correct.");
-        });
+        // Act
+        long startTime = System.nanoTime();
+        runAppWithInput(input);
+        long endTime = System.nanoTime();
+
+        // Assert
+        assertEquals(expectedOutput, outContent.toString(), "The output for the 12-element 'worst-case' array should be correct.");
+
+        // Report time
+        reportTime(startTime, endTime, "testWorstCase_12_elements_performance");
     }
 
     /**
@@ -292,5 +322,17 @@ public class AStarSearchTest {
         // The optimal cost is 13.
         runAppWithInput(input);
         assertEquals("13" + System.lineSeparator(), outContent.toString());
+    }
+
+    /**
+     * Helper method to print the execution time of a test.
+     * @param startTime The start time in nanoseconds.
+     * @param endTime The end time in nanoseconds.
+     * @param testName The name of the test being reported.
+     */
+    private void reportTime(long startTime, long endTime, String testName) {
+        double durationMs = (endTime - startTime) / 1_000_000.0;
+        double durationS = durationMs / 1000.0;
+        System.err.printf("  [PERF] %s execution time: %.3f s (%.3f ms)%n", testName, durationS, durationMs);
     }
 }

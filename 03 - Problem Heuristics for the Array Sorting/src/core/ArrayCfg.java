@@ -5,6 +5,9 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.ArrayDeque;
 
 /**
  * Represents an immutable configuration of the integer array sorting problem.
@@ -209,28 +212,58 @@ public final class ArrayCfg implements Ilayout {
         int n = data.length;
         if (goalCfg.data.length != n) return Double.POSITIVE_INFINITY;
 
-        // 1) Map goal values -> queue of positions (handles duplicates)
-        java.util.Map<Integer, java.util.ArrayDeque<Integer>> posMap = new java.util.HashMap<>();
-        for (int j = 0; j < n; j++) {
-            posMap.computeIfAbsent(goalCfg.data[j], k -> new java.util.ArrayDeque<>()).addLast(j);
-        }
+        // 1) Pos map (goal value -> queue of positions)
+        Map<Integer, ArrayDeque<Integer>> posMap = buildPosMap(goalCfg);
 
-        // 2) Build targetIndex: where the element at i should go in the goal
+        // 2) targetIndex (for each i, where data[i] must go in goal)
+        int[] targetIndex = buildTargetIndex(posMap);
+
+        // 3) decompose cycles and compute heuristic contributions
+        CycleProcessResult result = processCycles(targetIndex, goalCfg);
+
+        // 4) handle aggregated fallback (cycles > 5)
+        double heuristic = result.heuristic
+                + greedyCostForFallback(result.totalSwapsNeededFallback, result.evenRemFallback, result.oddRemFallback);
+
+        return heuristic;
+    }
+
+    /* -------------------- Helper private methods -------------------- */
+
+    private Map<Integer, ArrayDeque<Integer>> buildPosMap(ArrayCfg goalCfg) {
+        int n = goalCfg.data.length;
+        Map<Integer, ArrayDeque<Integer>> posMap = new HashMap<>(n * 2);
+        for (int j = 0; j < n; j++) {
+            posMap.computeIfAbsent(goalCfg.data[j], k -> new ArrayDeque<>()).addLast(j);
+        }
+        return posMap;
+    }
+
+    private int[] buildTargetIndex(Map<Integer, ArrayDeque<Integer>> posMap) {
+        int n = data.length;
         int[] targetIndex = new int[n];
         for (int i = 0; i < n; i++) {
-            java.util.ArrayDeque<Integer> q = posMap.get(data[i]);
+            ArrayDeque<Integer> q = posMap.get(data[i]);
             if (q == null || q.isEmpty()) {
-                // multisets differ -> unreachable goal mapping
-                return Double.POSITIVE_INFINITY;
+                // multisets differ -> unreachable mapping
+                // preserve previous behaviour: return an invalid mapping that will be handled by caller
+                throw new IllegalArgumentException("Data and goal multisets differ");
             }
             targetIndex[i] = q.removeFirst();
         }
+        return targetIndex;
+    }
 
-        // 3) Decompose permutation into cycles and process each cycle
+    /**
+     * Processa os ciclos da permutação targetIndex e retorna:
+     * - soma das contribuições determinísticas (2-cycles e ciclos k<=5)
+     * - dados agregados para fallback (ciclos > 5)
+     */
+    private CycleProcessResult processCycles(int[] targetIndex, ArrayCfg goalCfg) {
+        int n = data.length;
         boolean[] visited = new boolean[n];
         double heuristic = 0.0;
 
-        // We'll accumulate counts for the fallback (cycles > 5)
         int totalSwapsNeededFallback = 0;
         int evenRemFallback = 0;
         int oddRemFallback = 0;
@@ -241,161 +274,155 @@ public final class ArrayCfg implements Ilayout {
                 continue;
             }
 
-            // Collect the cycle: positions and their current values and goal values
+            // collect cycle positions and values
             int cur = i;
-            java.util.ArrayList<Integer> cyclePos = new java.util.ArrayList<>();
-            java.util.ArrayList<Integer> cycleVals = new java.util.ArrayList<>();
-            java.util.ArrayList<Integer> cycleGoalVals = new java.util.ArrayList<>();
+            ArrayList<Integer> cycleVals = new ArrayList<>();
+            ArrayList<Integer> cycleGoalVals = new ArrayList<>();
 
             while (!visited[cur]) {
                 visited[cur] = true;
-                cyclePos.add(cur);
                 cycleVals.add(data[cur]);
                 cycleGoalVals.add(goalCfg.data[cur]);
                 cur = targetIndex[cur];
             }
 
-            int k = cyclePos.size();
+            int k = cycleVals.size();
             if (k <= 1) continue;
 
             if (k == 2) {
-                // Exact cost for 2-cycle (one swap)
-                int a = cycleVals.get(0);
-                int b = cycleVals.get(1);
-                heuristic += calculateCost(a, b);
+                // exact cost for 2-cycle
+                heuristic += calculateCost(cycleVals.get(0), cycleVals.get(1));
             } else if (k <= 5) {
-                // Brute-force all sequences of (k-1) swaps among the k positions.
-                // Each swap is an unordered pair (p,q) with p<q in [0..k-1] index space for the cycle.
-                int pairs = k * (k - 1) / 2;
-                // Build list of all pair index pairs (indices into cycle arrays)
-                java.util.ArrayList<int[]> pairList = new java.util.ArrayList<>(pairs);
-                for (int a = 0; a < k - 1; a++) {
-                    for (int b = a + 1; b < k; b++) {
-                        pairList.add(new int[]{a, b});
-                    }
-                }
-
-                // We need to generate all sequences of length (k-1) where each element is an index into pairList.
-                int steps = k - 1;
-                long sequences = 1;
-                for (int s = 0; s < steps; s++) sequences *= pairList.size(); // safe: at most 10^4 for k=5
-
-                double bestCost = Double.POSITIVE_INFINITY;
-
-                // Iterate sequences using mixed-radix counting (index vector)
-                int base = pairList.size();
-                int[] idx = new int[steps];
-                for (long seq = 0; seq < sequences; seq++) {
-                    // simulate applying the sequence of swaps on a local copy of the cycle values
-                    int[] curVals = new int[k];
-                    for (int t = 0; t < k; t++) curVals[t] = cycleVals.get(t);
-
-                    double costSum = 0.0;
-                    for (int step = 0; step < steps; step++) {
-                        int pairIndex = idx[step];
-                        int p = pairList.get(pairIndex)[0];
-                        int q = pairList.get(pairIndex)[1];
-
-                        // values at the time of swap
-                        int va = curVals[p];
-                        int vb = curVals[q];
-                        costSum += calculateCost(va, vb);
-
-                        // perform swap
-                        int tmp = curVals[p];
-                        curVals[p] = curVals[q];
-                        curVals[q] = tmp;
-
-                        // small early pruning: if costSum already >= bestCost, stop this sequence
-                        if (costSum >= bestCost) break;
-                    }
-
-                    // After the sequence, check if positions are in goal values
-                    boolean matches = true;
-                    if (costSum < bestCost) {
-                        for (int t = 0; t < k; t++) {
-                            if (curVals[t] != cycleGoalVals.get(t)) {
-                                matches = false;
-                                break;
-                            }
-                        }
-                        if (matches) {
-                            bestCost = costSum;
-                        }
-                    }
-
-                    // increment mixed-radix index array
-                    for (int p = steps - 1; p >= 0; p--) {
-                        idx[p]++;
-                        if (idx[p] < base) break;
-                        idx[p] = 0;
-                    }
-                }
-
-                // If for some reason no sequence solved the cycle (shouldn't happen), fallback to relaxed idea:
-                if (bestCost == Double.POSITIVE_INFINITY) {
-                    // fall back to conservative estimate: count parities and add (k-1) as swaps
-                    int evenCount = 0, oddCount = 0;
-                    for (int v : cycleVals) {
-                        boolean ev = (v == 0) || ((v & 1) == 0);
-                        if (ev) evenCount++; else oddCount++;
-                    }
-                    // consume greedily (same as fallback below)
-                    int swapsNeeded = k - 1;
-                    for (int s = 0; s < swapsNeeded; s++) {
-                        if (evenCount >= 2) {
-                            bestCost = (bestCost == Double.POSITIVE_INFINITY ? 0 : bestCost) + 2;
-                            evenCount -= 2;
-                        } else if (evenCount >= 1 && oddCount >= 1) {
-                            bestCost = (bestCost == Double.POSITIVE_INFINITY ? 0 : bestCost) + 11;
-                            evenCount -= 1;
-                            oddCount -= 1;
-                        } else if (oddCount >= 2) {
-                            bestCost = (bestCost == Double.POSITIVE_INFINITY ? 0 : bestCost) + 20;
-                            oddCount -= 2;
-                        } else {
-                            // conservative: break (shouldn't happen)
-                            break;
-                        }
-                    }
-                    if (bestCost == Double.POSITIVE_INFINITY) bestCost = 0.0;
-                }
-
-                heuristic += bestCost;
+                // exact (enumeration) for small cycles
+                heuristic += costForSmallCycle(cycleVals, cycleGoalVals);
             } else {
-                // For large cycles we use the relaxed/guloso parities approach (admissible and O(n))
+                // aggregate counts for fallback greedy
                 int evenCount = 0, oddCount = 0;
                 for (int v : cycleVals) {
                     boolean ev = (v == 0) || ((v & 1) == 0);
                     if (ev) evenCount++; else oddCount++;
                 }
-                int swapsNeeded = k - 1;
-                totalSwapsNeededFallback += swapsNeeded;
+                totalSwapsNeededFallback += (k - 1);
                 evenRemFallback += evenCount;
                 oddRemFallback += oddCount;
             }
         }
 
-        // 4) handle aggregated fallback swaps (from cycles of size > 5)
-        for (int s = 0; s < totalSwapsNeededFallback; s++) {
-            if (evenRemFallback >= 2) {
-                heuristic += 2;
-                evenRemFallback -= 2;
-            } else if (evenRemFallback >= 1 && oddRemFallback >= 1) {
-                heuristic += 11;
-                evenRemFallback -= 1;
-                oddRemFallback -= 1;
-            } else if (oddRemFallback >= 2) {
-                heuristic += 20;
-                oddRemFallback -= 2;
-            } else {
-                // no more pairs available (should be rare); break conservatively
-                break;
+        return new CycleProcessResult(heuristic, totalSwapsNeededFallback, evenRemFallback, oddRemFallback);
+    }
+
+    /**
+     * Bruteforce (with light pruning) the minimal cost to reorder the cycle values into cycleGoalVals
+     * using exactly (k-1) swaps among the k positions. Assumes k in [3..5].
+     */
+    private double costForSmallCycle(List<Integer> cycleVals, List<Integer> cycleGoalVals) {
+        final int k = cycleVals.size();
+        // build pair list of unordered index pairs
+        ArrayList<int[]> pairList = new ArrayList<>();
+        for (int a = 0; a < k - 1; a++) {
+            for (int b = a + 1; b < k; b++) {
+                pairList.add(new int[]{a, b});
             }
         }
 
-        return heuristic;
+        int steps = k - 1;
+        int base = pairList.size();
+        long sequences = 1;
+        for (int s = 0; s < steps; s++) sequences *= base; // <= 10_000 for k=5
+
+        double bestCost = Double.POSITIVE_INFINITY;
+        int[] idx = new int[steps];
+
+        for (long seq = 0; seq < sequences; seq++) {
+            // simulate
+            int[] curVals = new int[k];
+            for (int t = 0; t < k; t++) curVals[t] = cycleVals.get(t);
+
+            double costSum = 0.0;
+            boolean pruned = false;
+            for (int step = 0; step < steps; step++) {
+                int pairIndex = idx[step];
+                int p = pairList.get(pairIndex)[0];
+                int q = pairList.get(pairIndex)[1];
+
+                int va = curVals[p], vb = curVals[q];
+                costSum += calculateCost(va, vb);
+
+                // swap
+                int tmp = curVals[p]; curVals[p] = curVals[q]; curVals[q] = tmp;
+
+                if (costSum >= bestCost) { pruned = true; break; }
+            }
+
+            if (!pruned) {
+                boolean matches = true;
+                for (int t = 0; t < k; t++) {
+                    if (curVals[t] != cycleGoalVals.get(t)) { matches = false; break; }
+                }
+                if (matches && costSum < bestCost) bestCost = costSum;
+            }
+
+            // increment mixed-radix index
+            for (int p = steps - 1; p >= 0; p--) {
+                idx[p]++;
+                if (idx[p] < base) break;
+                idx[p] = 0;
+            }
+        }
+
+        if (bestCost == Double.POSITIVE_INFINITY) {
+            // fallback conservative greedy pairing (should be rare)
+            int even = 0, odd = 0;
+            for (int v : cycleVals) { if ((v == 0) || ((v & 1) == 0)) even++; else odd++; }
+            int swapsNeeded = k - 1;
+            double sum = 0;
+            for (int s = 0; s < swapsNeeded; s++) {
+                if (even >= 2) { sum += 2; even -= 2; }
+                else if (even >= 1 && odd >= 1) { sum += 11; even -= 1; odd -= 1; }
+                else if (odd >= 2) { sum += 20; odd -= 2; }
+                else break;
+            }
+            return sum;
+        }
+
+        return bestCost;
     }
+
+    /**
+     * Greedy cost to consume aggregated swapsNeeded using even/odd counts.
+     * Returns the added cost.
+     */
+    private double greedyCostForFallback(int swapsNeeded, int evenCount, int oddCount) {
+        double cost = 0.0;
+        for (int s = 0; s < swapsNeeded; s++) {
+            if (evenCount >= 2) {
+                cost += 2; evenCount -= 2;
+            } else if (evenCount >= 1 && oddCount >= 1) {
+                cost += 11; evenCount -= 1; oddCount -= 1;
+            } else if (oddCount >= 2) {
+                cost += 20; oddCount -= 2;
+            } else {
+                break; // conservative
+            }
+        }
+        return cost;
+    }
+
+    /* -------------------- Small helper types -------------------- */
+    private static final class CycleProcessResult {
+        final double heuristic;
+        final int totalSwapsNeededFallback;
+        final int evenRemFallback;
+        final int oddRemFallback;
+        CycleProcessResult(double heuristic, int totalSwapsNeededFallback, int evenRemFallback, int oddRemFallback) {
+            this.heuristic = heuristic;
+            this.totalSwapsNeededFallback = totalSwapsNeededFallback;
+            this.evenRemFallback = evenRemFallback;
+            this.oddRemFallback = oddRemFallback;
+        }
+    }
+
+    /* --------^^---------- Helper private methods -------^^----------- */
 
     /**
      * Returns a string representation of the layout.
