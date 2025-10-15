@@ -12,7 +12,7 @@ import java.util.Queue;
  * evaluation function f(n) = g(n) + h(n).
  *
  * @author Brandon Mejia
- * @version 2025-10-14
+ * @version 2025-10-15
  */
 public class AStarSearch extends AbstractSearch {
     /**

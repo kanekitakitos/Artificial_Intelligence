@@ -26,7 +26,7 @@ import java.util.List;
  * @see ArrayCfg
  * @see Board
  * @author Brandon Mejia
- * @version 2025-09-30
+ * @version 2025-10-15
  */
 public interface Ilayout
 {

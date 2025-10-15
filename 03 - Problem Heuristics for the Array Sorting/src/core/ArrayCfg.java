@@ -36,7 +36,7 @@ import java.util.ArrayDeque;
  * @see Ilayout
  * @see GSolver
  * @author Brandon Mejia
- * @version 2025-09-30
+ * @version 2025-10-15
  */
 public final class ArrayCfg implements Ilayout {
 
@@ -237,7 +237,9 @@ public final class ArrayCfg implements Ilayout {
  * It is implemented as a stateless calculator using a sophisticated hybrid strategy based on
  * <b>permutation cycle decomposition</b>. This provides a very tight lower-bound estimate of the
  * true cost, making the A* search extremely efficient.
- *
+ * @author Brandon Mejia
+     *
+     *
  * @see #compute()
  */
 private static final class Heuristic {

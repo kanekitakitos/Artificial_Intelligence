@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  * using the A* algorithm. It provides test cases based on the assignment description to verify
  * the correctness and optimality of the solutions found.
  * @author Brandon Mejia
- * @version 2025-10-01
+ * @version 2025-10-15
  */
 public class AStarSearchTest {
 
@@ -371,4 +371,69 @@ public class AStarSearchTest {
 //        // Report time
 //        reportTime(startTime, endTime, "testMultipleDisjointCycles_performance");
 //    }
+
+    /*
+     * ---------------------------------------------------------------------------------
+     *  Specific tests for each part of the heuristic's hybrid strategy
+     * ---------------------------------------------------------------------------------
+     */
+
+    @Test
+    @DisplayName("Heuristic Part: 2-Cycles Only")
+    void testHeuristic_2_Cycles_Only() throws Exception {
+        // Arrange
+        String input = "2 1 4 3 6 5\n1 2 3 4 5 6\n";
+        String expectedOutput = "33" + System.lineSeparator();
+
+        // Act
+        long startTime = System.nanoTime();
+        runAppWithInput(input);
+        long endTime = System.nanoTime();
+
+        // Assert
+        assertEquals(expectedOutput, outContent.toString());
+
+        // Report time
+        reportTime(startTime, endTime, "testHeuristic_2_Cycles_Only");
+    }
+
+
+    @Test
+    @DisplayName("Heuristic Part: Small Cycle (k=4) Brute-Force")
+    void testHeuristic_SmallCycle_BruteForce() throws Exception {
+        // Arrange
+        String input = "2 3 4 1\n1 2 3 4\n";
+        String expectedOutput = "24" + System.lineSeparator();
+
+        // Act
+        long startTime = System.nanoTime();
+        runAppWithInput(input);
+        long endTime = System.nanoTime();
+
+        // Assert
+        assertEquals(expectedOutput, outContent.toString());
+
+        // Report time
+        reportTime(startTime, endTime, "testHeuristic_SmallCycle_BruteForce");
+    }
+
+
+    @Test
+    @DisplayName("Heuristic Part: Large Cycle (k=6) Greedy Fallback")
+    void testHeuristic_LargeCycle_Greedy() throws Exception {
+        // Arrange
+        String input = "2 3 4 5 6 1\n1 2 3 4 5 6\n";
+        String expectedOutput = "37" + System.lineSeparator();
+
+        // Act
+        long startTime = System.nanoTime();
+        runAppWithInput(input);
+        long endTime = System.nanoTime();
+
+        // Assert
+        assertEquals(expectedOutput, outContent.toString());
+
+        // Report time
+        reportTime(startTime, endTime, "testHeuristic_LargeCycle_Greedy");
+    }
 }

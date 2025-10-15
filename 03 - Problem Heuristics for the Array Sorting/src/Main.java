@@ -21,13 +21,7 @@ import java.util.Scanner;
 public class Main {
     public static void main (String [] args)
     {
-        boolean gSolve = false;
-
-        if(gSolve)
-            GSolve();
-        else
-            AStarSearch();
-            //bestFirst();
+        AStarSearch();
     }
 
     public static void AStarSearch()
@@ -80,6 +74,7 @@ public class Main {
         sc.close();
 
     }
+
     /**
      * Executes the 8-puzzle problem solver.
      * <p>
