@@ -1,102 +1,213 @@
-# Array Sorting with Heuristic Search
+# Compêndio de Exemplos para Heurística A* Baseada em Ciclos
 
-Este projeto explora a resolução de um problema de ordenação de arrays utilizando algoritmos de busca em espaços de estados. O objetivo é encontrar a sequência de trocas (swaps) de custo mínimo para transformar um array inicial em um array objetivo.
+**Autor:** Brandon Mejia
 
-O custo de cada troca depende da paridade dos números envolvidos:
-- **Par-Par**: Coste 2
-- **Impar-Impar**: Coste 20
-- **Par-Impar**: Coste 11
+Este documento serve como um guia detalhado e um compêndio de exemplos para uma heurística do algoritmo A*, focada na resolução de problemas de ordenação através da análise de ciclos de permutação.
 
-## Algoritmos Implementados
+## Índice
 
-O projeto implementa e compara dois algoritmos de busca fundamentais:
-
-1.  **`GSolver` (Busca de Custo Uniforme - UCS):**
-    - É um algoritmo de busca **não informada**.
-    - Explora o espaço de estados expandindo sempre o nó com o menor custo acumulado (`g(n)`) desde o início.
-    - Garante encontrar a solução de custo ótimo, mas pode ser extremamente lento em problemas complexos, já que explora muitas rotas desnecessárias por não ter um "senso de direção".
-
-2.  **`AStarSearch` (Busca A*):**
-    - É um algoritmo de busca **informada**, muito mais eficiente.
-    - Utiliza una función de evaluación `f(n) = g(n) + h(n)`, donde:
-        - `g(n)` é o custo real desde o estado inicial até o estado `n`.
-        - `h(n)` é uma **heurística** que estima o custo mínimo desde `n` até o estado objetivo.
-    - A chave de seu desempenho reside na qualidade da heurística `h(n)`.
+- [A Lógica Central da Heurística](#a-lógica-central-da-heurística)
+  - [Fase 1: O Diagnóstico (A Pergunta Chave)](#fase-1-o-diagnóstico-a-pergunta-chave)
+  - [Fase 2: O Mapeamento (A Resposta à Pergunta)](#fase-2-o-mapeamento-a-resposta-à-pergunta)
+  - [Fase 3: A Estratégia (O Tratamento segundo o Diagnóstico)](#fase-3-a-estratégia-o-tratamento-segundo-o-diagnóstico)
+- [Exemplos para Ciclos de Tamanho 2 (k=2)](#exemplos-para-ciclos-de-tamanho-2-k2)
+  - [Exemplo 2.1: Troca Par-Par](#exemplo-21-troca-par-par)
+  - [Exemplo 2.2: Troca Ímpar-Ímpar](#exemplo-22-troca-ímpar-ímpar)
+  - [Exemplo 2.3: Troca Par-Ímpar](#exemplo-23-troca-par-ímpar)
+- [Exemplos para Ciclos Pequenos (k=3, k=4)](#exemplos-para-ciclos-pequenos-k3-k4)
+  - [Exemplo 3.1: Ciclo de Tamanho 3 (Misto)](#exemplo-31-ciclo-de-tamanho-3-misto)
+  - [Exemplo 3.2: Ciclo de Tamanho 3 (Apenas Ímpares)](#exemplo-32-ciclo-de-tamanho-3-apenas-ímpares)
+  - [Exemplo 3.3: Ciclo de Tamanho 4 (Misto)](#exemplo-33-ciclo-de-tamanho-4-misto)
+- [Exemplos para Ciclos Grandes (k > 4)](#exemplos-para-ciclos-grandes-k--4)
+  - [Caso A: Ciclos com Números Pares](#caso-a-ciclos-com-números-pares)
+  - [Caso B: Ciclos Apenas com Números Ímpares](#caso-b-ciclos-apenas-com-números-ímpares)
 
 ---
 
-## A Heurística de A*: O Coração da Eficiência
+## A Lógica Central da Heurística
 
-A superioridade do algoritmo A* neste projeto se deve a uma heurística (`h(n)`) muito sofisticada e precisa, implementada na classe interna `ArrayCfg.Heuristic`. Esta heurística proporciona uma estimativa muito ajustada do custo real restante, permitindo ao algoritmo podar galhos inteiros da árvore de busca e encontrar a solução ótima de forma incrivelmente rápida.
+Esta secção resume o fluxo de "pensamento" do algoritmo, desde a identificação do problema até à aplicação de uma estratégia específica.
 
-A lógica se baseia no conceito matemático da **decomposição de permutações em ciclos disjuntos**.
+### Fase 1: O Diagnóstico (A Pergunta Chave)
 
-### 1. O que é a Descomposição em Ciclos?
+A primeira e mais importante pergunta que a heurística procura responder é:
 
-O problema de ordenar o array pode ser visto como transformar uma permutação de números em outra. Qualquer permutação pode ser decomposta em um conjunto de "ciclos" independentes.
+> *"Como é que as peças que estão fora do lugar se ligam umas às outras?"*
 
-**Ejemplo:**
-- Array Atual: `[2, 3, 1]`
-- Array Objetivo: `[1, 2, 3]`
+### Fase 2: O Mapeamento (A Resposta à Pergunta)
 
-Aqui, o elemento `2` está na posição de `1`, `3` está na posição de `2`, e `1` está na posição de `3`. Isto forma um único **3-ciclo**: `1 -> 2 -> 3 -> 1`.
+A resposta a essa pergunta é encontrada ao construir a **estrutura de ciclos**. Uma vez completada esta fase, o algoritmo já não sabe apenas *quantas* peças estão erradas, mas sim *como* os seus erros se relacionam entre si.
 
-A ideia fundamental é que **os ciclos são subproblemas independentes**. O custo total para ordenar o array é a soma dos custos para resolver cada ciclo separadamente. Um ciclo de comprimento `k` sempre requer um mínimo de `k-1` trocas para ser resolvido.
+### Fase 3: A Estratégia (O Tratamento segundo o Diagnóstico)
 
-### 2. Estratégia Híbrida para Calcular o Custo dos Ciclos
+O algoritmo analisa cada ciclo de forma individual e escolhe uma estratégia segundo o **TAMANHO** desse ciclo.
 
-A heurística não se conforma com uma estimativa simples. Utiliza uma **estratégia híbrida** para calcular o custo de cada ciclo com a máxima precisão possível, dependendo de seu tamanho:
+1.  **Ciclo de Tamanho 2:** Resolve-se com um único intercâmbio direto. É o caso mais simples e o custo calculado é o custo real e exato.
 
-#### a) 2-Ciclos (Trocas Simples)
-- **Lógica:** Um ciclo de comprimento 2 (ex: `A` na posição de `B` e `B` na de `A`) se resolve com uma única troca.
-- **Cálculo:** A heurística calcula o **custo exato** dessa única troca (`calculateCost(A, B)`). É a estimativa mais precisa possível.
+2.  **Ciclo de Tamanho 3 ou 4:** Aplica-se a "força bruta" combinatória para testar todas as sequências de trocas e encontrar o custo ótimo real para resolver esse pequeno ciclo.
 
-#### b) Ciclos Pequenos (3 e 4 elementos)
-- **Lógica:** Para ciclos de tamanho `k` de 3 ou 4, a heurística realiza uma **busca por força bruta** para encontrar o **custo ótimo real** para resolver esse subproblema.
-- **Cálculo:** Explora todas as sequências válidas de `k-1` trocas entre os elementos do ciclo e seleciona a de menor custo. Embora seja computacionalmente intensivo, para um `k` tão pequeno o custo é trivial, mas o ganho em precisão para a heurística é enorme.
+3.  **Ciclo de Tamanho Grande (k > 4):** Adota-se uma estratégia "inteligente e económica":
 
-#### c) Ciclos Grandes (> 4 elementos)
-- **Lógica:** Para ciclos maiores, a força bruta seria muito lenta. Em seu lugar, utiliza-se um **algoritmo guloso (greedy)** rápido e admissível, que varia segundo a composição do ciclo.
-- **Cálculo:**
-    - **Se o ciclo contém números pares:** A estratégia mais barata é usar um número par como "pivô". O custo é a soma de `(número de pares - 1)` trocas par-par (custo 2) e `(número de ímpares)` trocas par-ímpar (custo 11).
-    - **Se o ciclo contém apenas números ímpares:** Duas opções são consideradas:
-        1. Resolver o ciclo internamente com `k-1` trocas ímpar-ímpar (custo 20 cada).
-        2. "Pegar emprestado" um número par de fora do ciclo, realizar `k` trocas par-ímpar (custo 11 cada) e depois devolver o número par. A heurística usa o **mínimo** entre `(k-1)*20` e `k*11`. Se não houver números pares no array, apenas a primeira opção é possível.
+    *   **A) Se o ciclo contém pelo menos um número par:** Usa-se a estratégia do "pivô par" para evitar os dispendiosos intercâmbios entre ímpares. O custo é estimado com a fórmula de limite inferior (lower bound):
+        `Custo = (Nº_pares - 1) * 2 + (Nº_ímpares) * 11`
 
-### 3. Admissibilidade: A Garantia de Otimalidade
+    *   **B) Se o ciclo só contém números ímpares:** Faz-se uma análise de custo-benefício, comparando duas opções:
+        1.  *Opção Interna:* Resolver o ciclo com `k-1` trocas internas entre ímpares (custo alto: `(k-1) * 20`).
+        2.  *Opção "Empréstimo":* "Tomar emprestado" um número par de outra parte do array e usá-lo como pivô (custo: `k * 11`).
 
-A heurística é **admissível**, o que significa que **nunca superestima o custo real** para chegar ao objetivo. Isto é crucial, já que é a condição que garante que A* encontrará a solução ótima.
+        A heurística escolhe o custo **MÍNIMO** entre estas duas opções.
 
-A admissibilidade se mantém porque:
-- Para 2-ciclos, usa o custo **exato**.
-- Para ciclos pequenos, encontra o custo **ótimo**.
-- Para ciclos grandes, usa uma estimativa gulosa que representa o **melhor caso possível** (lower-bound).
+---
 
-Graças a esta combinação de precisão e eficiência, o algoritmo A* é capaz de resolver problemas muito complexos em milissegundos, enquanto um algoritmo não informado como `GSolver` levaria minutos, horas ou até mais.
+## Exemplos para Ciclos de Tamanho 2 (k=2)
 
-## Como Executar o Projeto
+### Exemplo 2.1: Troca Par-Par
 
-1.  **Classe Principal:** O ponto de entrada é `Main.java`. Por padrão, ele executa a busca A*.
-2.  **Entrada:** O programa espera duas linhas da entrada padrão:
-    - A primeira linha é o array inicial (números separados por espaços).
-    - A segunda linha é o array objetivo.
+```
+data: [1, 4, 3, 2]
+goal: [1, 2, 3, 4]
+```
 
-    **Ejemplo de entrada:**
-    ```
-    2 4 6 8 10 12 1 3 5 7 9 11
-    1 3 5 7 9 11 2 4 6 8 10 12
-    ```
-3.  **Saída:** O programa imprimirá um único número: o custo total mínimo da solução.
+-   **Identificação:** O ciclo é (índice 1 ↔ 3), envolvendo os valores `{4, 2}`.
+-   **Análise e Custo:** Ambos os valores são Pares. A troca é Par-Par.
+-   **Custo da Heurística = 2**
 
-## Estrutura do Projeto
+### Exemplo 2.2: Troca Ímpar-Ímpar
 
-- **`src/core`**: Contém as classes principais do motor de busca.
-  - `AbstractSearch.java`: Classe base abstrata para os algoritmos de busca.
-  - `AStarSearch.java`: Implementação do A*.
-  - `GSolver.java`: Implementação da Busca de Custo Uniforme.
-  - `ArrayCfg.java`: Representação do estado do problema e a lógica da heurística.
-  - `Ilayout.java`: Interface que define a estrutura de um estado.
-- **`src/test`**: Contém os testes unitários e de desempenho.
-  - `AStarSearchTest.java`: Testes para o algoritmo A*.
-  - `GSolverTest.java`: Testes para o algoritmo `GSolver`.
-  - `ComparisonTest.java`: Testes de benchmark que comparam a velocidade de ambos os algoritmos em casos complexos.
+```
+data: [5, 2, 3, 4, 1]
+goal: [1, 2, 3, 4, 5]
+```
+
+-   **Identificação:** O ciclo é (índice 0 ↔ 4), envolvendo os valores `{5, 1}`.
+-   **Análise e Custo:** Ambos os valores são Ímpares. A troca é Ímpar-Ímpar.
+-   **Custo da Heurística = 20**
+
+### Exemplo 2.3: Troca Par-Ímpar
+
+```
+data: [1, 2, 8, 4, 3]
+goal: [1, 2, 3, 4, 8]
+```
+
+-   **Identificação:** O ciclo é (índice 2 ↔ 4), envolvendo os valores `{8, 3}`.
+-   **Análise e Custo:** Um valor é Par (8) e o outro Ímpar (3). A troca é Par-Ímpar.
+-   **Custo da Heurística = 11**
+
+---
+
+## Exemplos para Ciclos Pequenos (k=3, k=4)
+
+### Exemplo 3.1: Ciclo de Tamanho 3 (Misto)
+
+```
+data: [2, 3, 1]
+goal: [1, 2, 3]
+```
+
+-   **Identificação:** O ciclo é (0 → 1 → 2 → 0), envolvendo `{2, 3, 1}`.
+-   **Análise e Custo:** A força bruta testa as sequências de 2 trocas. A sequência `(2,1)` e depois `(2,3)` custa `11+11=22`. A sequência `(3,1)` e depois `(2,3)` custa `20+11=31`. A heurística encontra o mínimo.
+-   **Custo da Heurística = 22**
+
+### Exemplo 3.2: Ciclo de Tamanho 3 (Apenas Ímpares)
+
+```
+data: [3, 5, 1]
+goal: [1, 3, 5]
+```
+
+-   **Identificação:** O ciclo é (0 → 1 → 2 → 0), envolvendo `{3, 5, 1}`.
+-   **Análise e Custo:** Todas as 2 trocas necessárias serão Ímpar-Ímpar. Custo = `2 * 20 = 40`.
+-   **Custo da Heurística = 40**
+
+### Exemplo 3.3: Ciclo de Tamanho 4 (Misto)
+
+```
+data: [2, 3, 4, 1]
+goal: [1, 2, 3, 4]
+```
+
+-   **Identificação:** O ciclo é (0 → 3 → 2 → 1 → 0), envolvendo `{2, 3, 4, 1}`.
+-   **Análise e Custo:** A força bruta testa sequências de 3 trocas. Uma sequência de baixo custo é `(2,1)` (custo 11), `(2,3)` (custo 11), `(2,4)` (custo 2), para um total de 24.
+-   **Custo da Heurística = 24**
+
+---
+
+## Exemplos para Ciclos Grandes (k > 4)
+
+### Caso A: Ciclos com Números Pares
+
+#### Exemplo 4.1: Ciclo k=5 (2 Pares, 3 Ímpares)
+
+```
+data: [12, 13, 14, 15, 11]
+goal: [11, 12, 13, 14, 15]
+```
+
+-   **Identificação:** Ciclo de tamanho 5 envolvendo `{12, 13, 14, 15, 11}`.
+-   **Análise:** `N_pares=2` (12, 14), `N_ímpares=3` (11, 13, 15).
+-   **Custo:** `(2-1)*2 + 3*11 = 1*2 + 33 = 35`.
+-   **Custo da Heurística = 35**
+
+#### Exemplo 4.2: Ciclo k=6 (4 Pares, 2 Ímpares)
+
+```
+data: [2, 4, 3, 6, 5, 8]
+goal: [8, 2, 3, 4, 5, 6]
+```
+
+-   **Identificação:** Ciclo de tamanho 6 envolvendo `{2, 4, 3, 6, 5, 8}`.
+-   **Análise:** `N_pares=4` (2, 4, 6, 8), `N_ímpares=2` (3, 5).
+-   **Custo:** `(4-1)*2 + 2*11 = 3*2 + 22 = 6+22=28`.
+-   **Custo da Heurística = 28**
+
+#### Exemplo 4.3: Ciclo k=7 (1 Par, 6 Ímpares)
+
+```
+data: [2, 3, 5, 7, 9, 11, 1]
+goal: [1, 2, 3, 5, 7, 9, 11]
+```
+
+-   **Identificação:** Ciclo de tamanho 7 envolvendo `{2, 3, 5, 7, 9, 11, 1}`.
+-   **Análise:** Valores: `{2, 3, 5, 7, 9, 11, 1}`. `N_pares=1` (só o 2), `N_ímpares=6`.
+-   **Custo:** `(1-1)*2 + 6*11 = 0*2 + 66 = 66`.
+-   **Custo da Heurística = 66**
+
+### Caso B: Ciclos Apenas com Números Ímpares
+
+#### Exemplo 4.4: k=5 com "Empréstimo" Possível
+
+```
+data: [3, 5, 7, 9, 1, 100]
+goal: [1, 3, 5, 7, 9, 100]
+```
+
+-   **Identificação:** Ciclo de tamanho 5 com `{3, 5, 7, 9, 1}`. O array contém um par (100) que não pertence ao ciclo.
+-   **Análise e Custo:**
+    -   Opção Interna: `(5-1) * 20 = 80`.
+    -   Opção "Empréstimo": `5 * 11 = 55`.
+-   **Custo da Heurística = min(80, 55) = 55**
+
+#### Exemplo 4.5: k=6 SEM Pares no Array
+
+```
+data: [3, 5, 7, 9, 11, 1]
+goal: [1, 3, 5, 7, 9, 11]
+```
+
+-   **Identificação:** Ciclo de tamanho 6 com `{3, 5, 7, 9, 11, 1}`. O array não tem pares.
+-   **Análise e Custo:** A opção de "empréstimo" é impossível. Apenas a estratégia interna é válida. Custo = `(6-1) * 20 = 100`.
+-   **Custo da Heurística = 100**
+
+#### Exemplo 4.6: k=7 com "Empréstimo" Possível
+
+```
+data: [3, 5, 7, 9, 11, 13, 1, 2]
+goal: [1, 3, 5, 7, 9, 11, 13, 2]
+```
+
+-   **Identificação:** Ciclo de tamanho 7 com `{3, 5, 7, 9, 11, 13, 1}`. O array contém um par (2) que não pertence ao ciclo.
+-   **Análise e Custo:**
+    -   Opção Interna: `(7-1) * 20 = 120`.
+    -   Opção "Empréstimo": `7 * 11 = 77`.
+-   **Custo da Heurística = min(120, 77) = 77**

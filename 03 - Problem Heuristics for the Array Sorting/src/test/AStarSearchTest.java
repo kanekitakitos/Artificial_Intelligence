@@ -62,12 +62,15 @@ public class AStarSearchTest {
         if (it==null) System.out.println("no solution found");
         else {
             // Iterate through the solution path to find the final state
-            AStarSearch.State finalState = null;
+            AStarSearch.State i = null;
             while(it.hasNext()) {
-                finalState = it.next();
+                i = it.next();
+                //System.err.print(i); // Imprime o estado atual (o layout)
+                //System.err.print(" -->  f*("+i.getSequenceId()+")  "+ i.getH() + "\n");
+
             }
             // Print only the cost of the final state
-            if (finalState != null) System.out.println((int)finalState.getG());
+            if (i != null) System.out.println((int)i.getG());
         }
         sc.close();
     }
@@ -91,6 +94,40 @@ public class AStarSearchTest {
         ByteArrayInputStream inContent = new ByteArrayInputStream(input.getBytes());
         System.setIn(inContent);
         main(null);
+    }
+
+    /**
+     * Helper method to print the execution time of a test.
+     * @param startTime The start time in nanoseconds.
+     * @param endTime The end time in nanoseconds.
+     * @param testName The name of the test being reported.
+     */
+    private void reportTime(long startTime, long endTime, String testName) {
+        // Multiply by 5 to simulate the performance on a slower virtual machine, as requested.
+        long durationNanos = (endTime - startTime);// *130;
+        executionTimes.add(durationNanos);
+
+        double durationMs = durationNanos / 1_000_000.0;
+        double durationS = durationMs / 1000.0;
+        System.err.printf("  [PERF] %s execution time: %.3f s (%.3f ms)%n", testName, durationS, durationMs);
+    }
+
+    /**
+     * After all tests are executed, this method calculates and prints the average execution time.
+     */
+    @AfterAll
+    static void printAverageTime() {
+        if (executionTimes.isEmpty()) {
+            return;
+        }
+
+        double averageNanos = executionTimes.stream().mapToLong(Long::longValue).average().orElse(0.0);
+        double averageMs = averageNanos / 1_000_000.0;
+        double averageS = averageMs / 1000.0;
+
+        System.err.println("\n---------------------------------------------------");
+        System.err.printf("  [AVG PERF] Average execution time for %d tests: %.3f s (%.3f ms)%n", executionTimes.size(), averageS, averageMs);
+        System.err.println("---------------------------------------------------");
     }
 
     /**
@@ -321,39 +358,6 @@ public class AStarSearchTest {
         // The optimal cost is 13.
         runAppWithInput(input);
         assertEquals("13" + System.lineSeparator(), outContent.toString());
-    }
-
-    /**
-     * Helper method to print the execution time of a test.
-     * @param startTime The start time in nanoseconds.
-     * @param endTime The end time in nanoseconds.
-     * @param testName The name of the test being reported.
-     */
-    private void reportTime(long startTime, long endTime, String testName) {
-        long durationNanos = endTime - startTime;
-        executionTimes.add(durationNanos);
-
-        double durationMs = durationNanos / 1_000_000.0;
-        double durationS = durationMs / 1000.0;
-        System.err.printf("  [PERF] %s execution time: %.3f s (%.3f ms)%n", testName, durationS, durationMs);
-    }
-
-    /**
-     * After all tests are executed, this method calculates and prints the average execution time.
-     */
-    @AfterAll
-    static void printAverageTime() {
-        if (executionTimes.isEmpty()) {
-            return;
-        }
-
-        double averageNanos = executionTimes.stream().mapToLong(Long::longValue).average().orElse(0.0);
-        double averageMs = averageNanos / 1_000_000.0;
-        double averageS = averageMs / 1000.0;
-
-        System.err.println("\n---------------------------------------------------");
-        System.err.printf("  [AVG PERF] Average execution time for %d tests: %.3f s (%.3f ms)%n", executionTimes.size(), averageS, averageMs);
-        System.err.println("---------------------------------------------------");
     }
 
     /*

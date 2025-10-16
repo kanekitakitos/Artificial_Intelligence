@@ -34,14 +34,15 @@ public class Main {
         if (it==null) System.out.println("no solution found");
         else {
 
+            AStarSearch.State i = null;
             while(it.hasNext())
             {
-                AStarSearch.State i = it.next();
-                //System.out.println(i); // Imprime o estado atual (o layout)
-
-                // Se for o último estado, imprime o custo total
-                if (!it.hasNext()) System.out.println((int)i.getG());
+                i = it.next();
+                //System.out.print(i); // Imprime o estado atual (o layout)
+                //System.out.print(" -->  f*("+i.getSequenceId()+")  "+ i.getH() + "\n");
             }
+            // Se for o último estado, imprime o custo total
+                if (!it.hasNext()) System.out.println((int)i.getG());
         }
         sc.close();
 
