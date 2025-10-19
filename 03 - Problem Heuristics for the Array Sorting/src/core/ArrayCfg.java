@@ -13,8 +13,9 @@ import java.util.ArrayDeque;
  * Represents an immutable configuration of the integer array sorting problem.
  *
  * This class implements the {@link Ilayout} interface, defining the state representation,
- * successor generation, and goal checking for the search algorithm. It is designed to be
- * immutable to ensure that states cannot be accidentally modified during the search process.
+ * successor generation, goal checking, and heuristic estimation for the search algorithm.
+ * It is designed to be immutable to ensure that states cannot be accidentally modified
+ * during the search process.
  *
  * <h3>Key Implementation Details</h3>
  * <h4>Immutability</h4>
@@ -33,9 +34,20 @@ import java.util.ArrayDeque;
  * statement: the first element is swapped with all elements to its right, then the second with all to its right, and so on.
  * </p>
  *
+ * <h4>Heuristic Function (h)</h4>
+ * <p>
+ * This class also implements a heuristic function via the {@link #getH(Ilayout)} method,
+ * which is crucial for informed search algorithms like A* ({@link AStarSearch}). The heuristic estimates the
+ * remaining cost to reach the goal state. It is based on analyzing the permutation cycles
+ * of the elements that are out of place, providing an admissible (never overestimating)
+ * estimate of the true cost. This allows the A* algorithm to explore the search space
+ * more efficiently compared to uninformed search methods like Uniform-Cost Search ({@link GSolver}).
+ * </p>
+ *
  * @see Ilayout
  * @see AStarSearch
- * @see GSolver 
+ * @see GSolver
+ * @see ArrayCfg
  * @author Brandon Mejia
  * @version 2024-10-15
  */
@@ -233,287 +245,294 @@ public final class ArrayCfg implements Ilayout {
 
 
     /**
-     * A private, static helper class that encapsulates the entire heuristic calculation.
-     * <p>
-     * This class acts as a stateless calculator that uses a sophisticated hybrid strategy based on
-     * <b>permutation decomposition into disjoint cycles</b>. The goal is to compute a very tight
-     * lower-bound cost estimate for sorting the array, which makes the A* search extremely efficient.
-     *
-     * <h3>Heuristic Strategy</h3>
-     * The permutation required to transform the current state into the goal state is decomposed into
-     * cycles. For example, if the current state is {@code [2, 3, 1]} and the goal is {@code [1, 2, 3]},
-     * the permutation is a single cycle {@code 1 -> 2 -> 3 -> 1}. The total heuristic cost is the
-     * sum of the estimated costs to resolve each of these cycles independently.
-     * <p>
-     * Resolving a cycle of size {@code k} requires a minimum of {@code k-1} swaps. The strategy
-     * to calculate the minimum cost to resolve a cycle varies with its size:
-     * <ul>
-     *   <li><b>2-element cycles (k=2):</b>
-     *       A single swap resolves the cycle. The exact and optimal cost of this swap is calculated.</li>
-     *
-     *   <li><b>Small cycles (k=3 or k=4):</b>
-     *       The number of swap sequences to resolve the cycle is small. A brute-force search is
-     *       performed to find the sequence of {@code k-1} swaps with the lowest real cost. This
-     *       guarantees an optimal heuristic for these subproblems.</li>
-     *
-     *   <li><b>Large cycles (k > 4):</b>
-     *       A brute-force search becomes computationally infeasible. A greedy and admissible
-     *       strategy is applied:
-     *       <ul>
-     *          <li><b>If the cycle contains even numbers:</b> The cheapest strategy is to use an even
-     *              number as a "pivot". The cost is the sum of {@code (number of evens - 1)} even-even
-     *              swaps (cost 2) and {@code (number of odds)} even-odd swaps (cost 11).</li>
-     *          <li><b>If the cycle contains only odd numbers:</b> Two options are considered:
-     *              1) Resolve the cycle internally with {@code k-1} odd-odd swaps (cost 20 each).
-     *              2) "Borrow" an even number from outside the cycle, perform {@code k} even-odd swaps
-     *                 (cost 11 each), and then return the even number. The heuristic uses the minimum
-     *                 of {@code (k-1)*20} and {@code k*11}. If there are no even numbers in the array,
-     *                 only the first option is possible.</li>
-     *       </ul>
-     *   </li>
-     * </ul>
-     * This approach ensures that the heuristic is always <b>admissible</b> (it never overestimates
-     * the true cost), which is an essential condition for A* to find the optimal solution.
-     *
-     * @author Brandon Mejia
-     * @see #compute()
-     */
-private static final class Heuristic {
-    private final int[] data;
-    private final int[] goal;
+         * A private, static helper class that encapsulates the entire heuristic calculation.
+         * <p>
+         * This class acts as a stateless calculator that uses a sophisticated hybrid strategy based on
+         * <b>permutation decomposition into disjoint cycles</b>. The goal is to compute a very tight
+         * lower-bound cost estimate for sorting the array, which makes the A* search extremely efficient.
+         *
+         * <h3>Heuristic Strategy</h3>
+         * The permutation required to transform the current state into the goal state is decomposed into
+         * cycles. For example, if the current state is {@code [2, 3, 1]} and the goal is {@code [1, 2, 3]},
+         * the permutation is a single cycle {@code 1 -> 2 -> 3 -> 1}. The total heuristic cost is the
+         * sum of the estimated costs to resolve each of these cycles independently.
+         * <p>
+         * Resolving a cycle of size {@code k} requires a minimum of {@code k-1} swaps. The strategy
+         * to calculate the minimum cost to resolve a cycle varies with its size:
+         * <ul>
+         *   <li><b>2-element cycles (k=2):</b>
+         *       A single swap resolves the cycle. The exact and optimal cost of this swap is calculated.</li>
+         *
+         *   <li><b>Small cycles (k=3 or k=4):</b>
+         *       The number of swap sequences to resolve the cycle is small. A brute-force search is
+         *       performed to find the sequence of {@code k-1} swaps with the lowest real cost. This
+         *       guarantees an optimal heuristic for these subproblems.</li>
+         *
+         *   <li><b>Large cycles (k > 4):</b>
+         *       A brute-force search becomes computationally infeasible. A greedy and admissible
+         *       strategy is applied:
+         *       <ul>
+         *          <li><b>If the cycle contains even numbers:</b> The cheapest strategy is to use an even
+         *              number as a "pivot". The cost is the sum of {@code (number of evens - 1)} even-even
+         *              swaps (cost 2) and {@code (number of odds)} even-odd swaps (cost 11).</li>
+         *          <li><b>If the cycle contains only odd numbers:</b> Two options are considered:
+         *              1) Resolve the cycle internally with {@code k-1} odd-odd swaps (cost 20 each).
+         *              2) "Borrow" an even number from outside the cycle, perform {@code k} even-odd swaps
+         *                 (cost 11 each), and then return the even number. The heuristic uses the minimum
+         *                 of {@code (k-1)*20} and {@code k*11}. If there are no even numbers in the array,
+         *                 only the first option is possible.</li>
+         *       </ul>
+         *   </li>
+         * </ul>
+         * This approach ensures that the heuristic is always <b>admissible</b> (it never overestimates
+         * the true cost), which is an essential condition for A* to find the optimal solution.
+         *
+         * @author Brandon Mejia
+         * @see #compute()
+         */
+    private record Heuristic(int[] data, int[] goal)
+    {
 
-    Heuristic(int[] data, int[] goal) {
-        this.data = data;
-        this.goal = goal;
-    }
+        /**
+         * Computes the heuristic value by decomposing the permutation into cycles and estimating the cost.
+         * <p>
+         * The calculation involves these steps:
+         * </p>
+         * <ol>
+         * <li><b>Mapping:</b> It first determines the target position for each element.</li>
+         * <li><b>Cycle Decomposition:</b> The permutation is broken down into disjoint cycles.</li>
+         * <li><b>Hybrid Cost Calculation:</b> The cost for resolving each cycle is estimated based on its size:
+         * <ul>
+         * <li><b>2-Cycles:</b> The exact cost of the single swap is calculated. This is optimal.</li>
+         * <li><b>Small Cycles (3-4 elements):</b> A brute-force search finds the true optimal cost for the subproblem.</li>
+         * <li><b>Large Cycles (>4 elements):</b> If the cycle contains an even number, it's used as a pivot. If the cycle is all-odd, the heuristic calculates the minimum cost between internal swaps and "borrowing" an external even number.</li>
+         * </ul>
+         * </li>
+         * </ol>
+         * <p>
+         * This heuristic is <b>admissible</b> because it never overestimates the true cost.
+         * </p>
+         * <ul>
+         * <li><b>Time Complexity:</b> O(n). The cycle decomposition is O(n). The brute-force for small
+         *     cycles (k=3, k=4) runs in constant time as k is bounded by 4. All other parts are linear.</li>
+         * <li><b>Space Complexity:</b> O(n). Primarily for the position map (`posMap`), the `targetIndex`
+         *     array, and the `visited` array. The space for cycle lists is reused and bounded by n.</li>
+         * </ul>
+         */
+        double compute() {
+            int n = data.length;
 
-    /**
-     * Computes the heuristic value by decomposing the permutation into cycles and estimating the cost.
-     * <p>
-     * The calculation involves these steps:
-     * </p>
-     * <ol>
-     * <li><b>Mapping:</b> It first determines the target position for each element.</li>
-     * <li><b>Cycle Decomposition:</b> The permutation is broken down into disjoint cycles.</li>
-     * <li><b>Hybrid Cost Calculation:</b> The cost for resolving each cycle is estimated based on its size:
-     * <ul>
-     * <li><b>2-Cycles:</b> The exact cost of the single swap is calculated. This is optimal.</li>
-     * <li><b>Small Cycles (3-4 elements):</b> A brute-force search finds the true optimal cost for the subproblem.</li>
-     * <li><b>Large Cycles (>4 elements):</b> If the cycle contains an even number, it's used as a pivot. If the cycle is all-odd, the heuristic calculates the minimum cost between internal swaps and "borrowing" an external even number.</li>
-     * </ul>
-     * </li>
-     * </ol>
-     * <p>
-     * This heuristic is <b>admissible</b> because it never overestimates the true cost.
-     * </p>
-     * <ul>
-     * <li><b>Time Complexity:</b> O(n). The cycle decomposition is O(n). The brute-force for small
-     *     cycles (k=3, k=4) runs in constant time as k is bounded by 4. All other parts are linear.</li>
-     * <li><b>Space Complexity:</b> O(n). Primarily for the position map (`posMap`), the `targetIndex`
-     *     array, and the `visited` array. The space for cycle lists is reused and bounded by n.</li>
-     * </ul>
-     */
-    double compute() {
-        int n = data.length;
+            boolean anyEvenNumberExists = checkForAnyEvenNumber();
 
-        boolean anyEvenNumberExists = checkForAnyEvenNumber();
+            Map<Integer, ArrayDeque<Integer>> posMap = buildGoalPositionMap(n);
 
-        Map<Integer, ArrayDeque<Integer>> posMap = buildGoalPositionMap(n);
+            int[] targetIndex = buildTargetIndexArray(n, posMap);
 
-        int[] targetIndex = buildTargetIndexArray(n, posMap);
-        if (targetIndex == null) {
-            return Double.POSITIVE_INFINITY;
+            if (targetIndex == null)
+                return Double.POSITIVE_INFINITY;
+
+
+            return calculateTotalHeuristicFromCycles(targetIndex, anyEvenNumberExists);
         }
 
-        return calculateTotalHeuristicFromCycles(targetIndex, anyEvenNumberExists);
-    }
+        /**
+         * Checks if at least one even number exists in the initial array.
+         */
+        private boolean checkForAnyEvenNumber() {
+            for (int val : data)
+                if ((val & 1) == 0)
+                    return true;
 
-    /** Checks if at least one even number exists in the initial array. */
-    private boolean checkForAnyEvenNumber() {
-        for (int val : data) {
-            if ((val & 1) == 0) {
-                return true;
-            }
+            return false;
         }
-        return false;
-    }
 
-    /** Builds a map from each value in the goal array to its position(s). */
-    private Map<Integer, ArrayDeque<Integer>> buildGoalPositionMap(int n) {
-        Map<Integer, ArrayDeque<Integer>> posMap = new HashMap<>(n * 2);
-        for (int j = 0; j < n; j++) {
-            posMap.computeIfAbsent(goal[j], k -> new ArrayDeque<>()).addLast(j);
+        /**
+         * Builds a map from each value in the goal array to its position(s).
+         */
+        private Map<Integer, ArrayDeque<Integer>> buildGoalPositionMap(int n) {
+            Map<Integer, ArrayDeque<Integer>> posMap = new HashMap<>(n * 2);
+            for (int j = 0; j < n; j++)
+                posMap.computeIfAbsent(goal[j], k -> new ArrayDeque<>()).addLast(j);
+
+            return posMap;
         }
-        return posMap;
-    }
 
-    /** Builds an array where targetIndex[i] is the goal position of the element data[i]. */
-    private int[] buildTargetIndexArray(int n, Map<Integer, ArrayDeque<Integer>> posMap) {
-        int[] targetIndex = new int[n];
-        for (int i = 0; i < n; i++) {
-            ArrayDeque<Integer> q = posMap.get(data[i]);
-            if (q == null || q.isEmpty()) {
-                return null; // Indicates an invalid mapping
+        /**
+         * Builds an array where targetIndex[i] is the goal position of the element data[i].
+         */
+        private int[] buildTargetIndexArray(int n, Map<Integer, ArrayDeque<Integer>> posMap) {
+            int[] targetIndex = new int[n];
+            for (int i = 0; i < n; i++) {
+                ArrayDeque<Integer> q = posMap.get(data[i]);
+                if (q == null || q.isEmpty())
+                    return null; // Indicates an invalid mapping
+
+
+                targetIndex[i] = q.removeFirst();
             }
-            targetIndex[i] = q.removeFirst();
+            return targetIndex;
         }
-        return targetIndex;
-    }
 
-    /** Decomposes the permutation into cycles and sums their individual heuristic costs. */
-    private double calculateTotalHeuristicFromCycles(int[] targetIndex, boolean anyEvenNumberExists) {
-        int n = data.length;
-        boolean[] visited = new boolean[n];
-        double totalHeuristic = 0.0;
+        /**
+         * Decomposes the permutation into cycles and sums their individual heuristic costs.
+         */
+        private double calculateTotalHeuristicFromCycles(int[] targetIndex, boolean anyEvenNumberExists) {
+            int n = data.length;
+            boolean[] visited = new boolean[n];
+            double totalHeuristic = 0.0;
 
-        for (int i = 0; i < n; i++) {
-            if (visited[i] || targetIndex[i] == i) {
-                visited[i] = true;
-                continue;
+            for (int i = 0; i < n; i++) {
+                if (visited[i] || targetIndex[i] == i) {
+                    visited[i] = true;
+                    continue;
+                }
+
+                ArrayList<Integer> cycleVals = new ArrayList<>();
+                ArrayList<Integer> cycleGoalVals = new ArrayList<>();
+                int cur = i;
+                while (!visited[cur]) {
+                    visited[cur] = true;
+                    cycleVals.add(data[cur]);
+                    cycleGoalVals.add(goal[cur]);
+                    cur = targetIndex[cur];
+                }
+
+                totalHeuristic += calculateCycleCost(cycleVals, cycleGoalVals, anyEvenNumberExists);
             }
-
-            ArrayList<Integer> cycleVals = new ArrayList<>();
-            ArrayList<Integer> cycleGoalVals = new ArrayList<>();
-            int cur = i;
-            while (!visited[cur]) {
-                visited[cur] = true;
-                cycleVals.add(data[cur]);
-                cycleGoalVals.add(goal[cur]);
-                cur = targetIndex[cur];
-            }
-
-            totalHeuristic += calculateCycleCost(cycleVals, cycleGoalVals, anyEvenNumberExists);
+            return totalHeuristic;
         }
-        return totalHeuristic;
-    }
 
-    /** Calculates the heuristic cost for a single cycle based on its size and content. */
-    private double calculateCycleCost(ArrayList<Integer> cycleVals, ArrayList<Integer> cycleGoalVals, boolean anyEvenNumberExists) {
-        int k = cycleVals.size();
-        if (k <= 1) return 0.0;
+        /**
+         * Calculates the heuristic cost for a single cycle based on its size and content.
+         */
+        private double calculateCycleCost(ArrayList<Integer> cycleVals, ArrayList<Integer> cycleGoalVals, boolean anyEvenNumberExists) {
+            int k = cycleVals.size();
+            if (k <= 1) return 0.0;
 
-        if (k == 2) {
-            return calculateCost(cycleVals.get(0), cycleVals.get(1));
-        } else if (k <= 4) {
-            return costForSmallCycle(cycleVals, cycleGoalVals);
-        } else {
-            // Logic for large cycles (k > 4)
-            int evenCount = 0;
-            for (int v : cycleVals) {
-                if ((v & 1) == 0) evenCount++;
-            }
+            if (k == 2)
+                return calculateCost(cycleVals.get(0), cycleVals.get(1));
+            else if (k <= 4)
+                return costForSmallCycle(cycleVals, cycleGoalVals);
+            else {
+                // Logic for large cycles (k > 4)
+                int evenCount = 0;
+                for (int v : cycleVals)
+                    if ((v & 1) == 0) evenCount++;
 
-            if (evenCount > 0) {
+
                 // Strategy: Use one of the cycle's even numbers as a pivot.
-                int oddCount = k - evenCount;
-                return (long)(evenCount - 1) * 2 + (long)oddCount * 11;
-            } else { // All-odd cycle
-                if (anyEvenNumberExists) {
+                if (evenCount > 0) {
+                    int oddCount = k - evenCount;
+                    return (long) (evenCount - 1) * 2 + (long) oddCount * 11;
+                } else // All-odd cycle
+                {
                     // Strategy: Compare internal swaps vs. "borrowing" an external even number.
-                    return Math.min((long)(k - 1) * 20, (long)k * 11);
-                } else {
-                    // No evens anywhere, must use odd-odd swaps.
-                    return (long)(k - 1) * 20;
+                    if (anyEvenNumberExists)
+                        return Math.min((long) (k - 1) * 20, (long) k * 11);
+
+                        // No evens anywhere, must use odd-odd swaps.
+                    else
+                        return (long) (k - 1) * 20;
+
                 }
             }
         }
-    }
 
 
-    /**
-     * Finds the minimal cost to resolve a small cycle by brute-forcing all valid swap sequences.
-     * <p>
-     * A sequence is valid if it consists of exactly (k-1) swaps and sorts the cycle.
-     * This method assumes k is small (3 or 4).
-     * </p>
-     * <h3>Algorithm</h3>
-     * <p>
-     * It generates all possible sequences of (k-1) swaps. For a cycle of size k, there are
-     * C(k, 2) = k*(k-1)/2 possible pairs to swap. This method explores all (C(k, 2))^(k-1)
-     * sequences, which is feasible for k=3 (3^2=9 sequences) and k=4 (6^3=216 sequences).
-     * </p>
-     * <p>
-     * An aggressive pruning strategy is used: if the partial cost of a sequence already
-     * exceeds the best cost found so far, that entire branch of sequences is discarded.
-     * </p>
-     */    
-    private static double costForSmallCycle(List<Integer> cycleVals, List<Integer> cycleGoalVals) {
-        final int k = cycleVals.size();
-        ArrayList<int[]> pairList = new ArrayList<>();
-        for (int a = 0; a < k - 1; a++) {
-            for (int b = a + 1; b < k; b++) {
-                pairList.add(new int[]{a, b});
+        /**
+         * Finds the minimal cost to resolve a small cycle by brute-forcing all valid swap sequences.
+         * <p>
+         * A sequence is valid if it consists of exactly (k-1) swaps and sorts the cycle.
+         * This method assumes k is small (3 or 4).
+         * </p>
+         * <h3>Algorithm</h3>
+         * <p>
+         * It generates all possible sequences of (k-1) swaps. For a cycle of size k, there are
+         * C(k, 2) = k*(k-1)/2 possible pairs to swap. This method explores all (C(k, 2))^(k-1)
+         * sequences, which is possible for k=3 (3^2=9 sequences) and k=4 (6^3=216 sequences).
+         * </p>
+         * <p>
+         * An aggressive pruning strategy is used: if the partial cost of a sequence already
+         * exceeds the best cost found so far, that entire branch of sequences is discarded.
+         * </p>
+         */
+        private static double costForSmallCycle(List<Integer> cycleVals, List<Integer> cycleGoalVals) {
+            final int k = cycleVals.size();
+            ArrayList<int[]> pairList = new ArrayList<>();
+            for (int a = 0; a < k - 1; a++) {
+                for (int b = a + 1; b < k; b++) {
+                    pairList.add(new int[]{a, b});
+                }
             }
-        }
 
-        int steps = k - 1;
-        int base = pairList.size();
-        long sequences = 1;
-        for (int s = 0; s < steps; s++) sequences *= base;
+            int steps = k - 1;
+            int base = pairList.size();
+            long sequences = 1;
+            for (int s = 0; s < steps; s++) sequences *= base;
 
-        double bestCost = Double.POSITIVE_INFINITY;
-        int[] idx = new int[steps];
+            double bestCost = Double.POSITIVE_INFINITY;
+            int[] idx = new int[steps];
 
 
-        int[] curVals = new int[k];
-        int[] initialCycleVals = cycleVals.stream().mapToInt(i -> i).toArray();
+            int[] curVals = new int[k];
+            int[] initialCycleVals = cycleVals.stream().mapToInt(i -> i).toArray();
 
-        outer:
-        for (long seq = 0; seq < sequences; seq++)
-        {
+            outer:
+            for (long seq = 0; seq < sequences; seq++) {
 
-            System.arraycopy(initialCycleVals, 0, curVals, 0, k);
+                System.arraycopy(initialCycleVals, 0, curVals, 0, k);
 
-            double costSum = 0.0;
-            for (int step = 0; step < steps; step++)
-            {
-                int pairIndex = idx[step];
-                int p = pairList.get(pairIndex)[0];
-                int q = pairList.get(pairIndex)[1];
-                int va = curVals[p], vb = curVals[q];
-                costSum += ArrayCfg.calculateCost(va, vb);
+                double costSum = 0.0;
+                for (int step = 0; step < steps; step++) {
+                    int pairIndex = idx[step];
+                    int p = pairList.get(pairIndex)[0];
+                    int q = pairList.get(pairIndex)[1];
+                    int va = curVals[p], vb = curVals[q];
+                    costSum += ArrayCfg.calculateCost(va, vb);
 
-                int tmp = curVals[p]; curVals[p] = curVals[q]; curVals[q] = tmp;
+                    int tmp = curVals[p];
+                    curVals[p] = curVals[q];
+                    curVals[q] = tmp;
 
-                if (costSum >= bestCost) {
-                    // Pruning: advance index and skip to the next sequence
-                    for (int pidx = steps - 1; pidx >= 0; pidx--) {
-                        idx[pidx]++;
-                        if (idx[pidx] < base) break;
-                        idx[pidx] = 0;
+                    if (costSum >= bestCost) {
+                        // Pruning: advance index and skip to the next sequence
+                        for (int pidx = steps - 1; pidx >= 0; pidx--) {
+                            idx[pidx]++;
+                            if (idx[pidx] < base) break;
+                            idx[pidx] = 0;
+                        }
+                        continue outer;
                     }
-                    continue outer;
+                }
+
+                // Check if this sequence is a valid solution
+                boolean matches = true;
+                for (int t = 0; t < k; t++) {
+                    if (curVals[t] != cycleGoalVals.get(t)) {
+                        matches = false;
+                        break;
+                    }
+                }
+                if (matches && costSum < bestCost) {
+                    bestCost = costSum;
+                }
+
+                // Manually increment index to get the next permutation of swaps
+                for (int pidx = steps - 1; pidx >= 0; pidx--) {
+                    idx[pidx]++;
+                    if (idx[pidx] < base) break;
+                    idx[pidx] = 0;
                 }
             }
 
-            // Check if this sequence is a valid solution
-            boolean matches = true;
-            for (int t = 0; t < k; t++) {
-                if (curVals[t] != cycleGoalVals.get(t)) {
-                    matches = false;
-                    break;
-                }
-            }
-            if (matches && costSum < bestCost) {
-                bestCost = costSum;
+            if (bestCost == Double.POSITIVE_INFINITY) {
+                // This fallback should theoretically never be reached if the logic is correct,
+                // as a solution with k-1 swaps must exist. It's a safeguard.
+                throw new IllegalStateException("Brute-force for small cycle failed to find a solution.");
             }
 
-            // Manually increment index to get the next permutation of swaps
-            for (int pidx = steps - 1; pidx >= 0; pidx--) {
-                idx[pidx]++;
-                if (idx[pidx] < base) break;
-                idx[pidx] = 0;
-            }
+            return bestCost;
         }
-
-        if (bestCost == Double.POSITIVE_INFINITY) {
-            // This fallback should theoretically never be reached if the logic is correct,
-            // as a solution with k-1 swaps must exist. It's a safeguard.
-            throw new IllegalStateException("Brute-force for small cycle failed to find a solution.");
-        }
-
-        return bestCost;
     }
-}
 
 }
