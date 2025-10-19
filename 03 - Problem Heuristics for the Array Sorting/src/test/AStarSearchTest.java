@@ -563,7 +563,85 @@ public class AStarSearchTest {
         reportTime(startTime, endTime, "testCorrectness_Sample_9_elements");
     }
 
+    /**
+     * Observational test to verify the linear time complexity O(n) of the heuristic calculation.
+     * <p>
+     * This test measures the execution time of the heuristic computation for several increasing
+     * array sizes (n). It then calculates the ratio of time/n. For a linear algorithm, this
+     * ratio should remain roughly constant.
+     * </p>
+     * <p>
+     * The output is printed to System.err for manual inspection. We expect to see that when 'n'
+     * doubles, the execution time also roughly doubles. This confirms the O(n) behavior.
+     * </p>
+     */
+    @Test
+    @DisplayName("Complexity Verification: Heuristic is O(n)")
+    void testHeuristic_TimeComplexity_Is_Linear()
+    {
 
 
+        // --- Aggressive JIT Warm-up Phase ---
+        // We run the heuristic on the largest data size beforehand to ensure the JIT
+        // has compiled and optimized the hot code paths before we start measuring.
+        System.err.println("Warming up JIT compiler... (this may take a moment)");
+        int maxN = 32000;
+        ArrayCfg warmUpInitial = new ArrayCfg(IntStream.range(1, maxN + 1).mapToObj(String::valueOf).collect(Collectors.joining(" ")));
+        ArrayCfg warmUpGoal = new ArrayCfg(IntStream.range(1, maxN + 1).mapToObj(String::valueOf).collect(Collectors.joining(" ")));
+        // Run thousands of times to be sure
+        for (int i = 0; i < 2000; i++) {
+            warmUpInitial.getH(warmUpGoal);
+        }
+        System.err.println("Warm-up complete. Starting measurements.");
+        System.err.println("-------------|--------------------|----------------------");
+
+
+
+        System.err.println("\n--- Heuristic O(n) Complexity Verification ---");
+        System.err.printf("%-12s | %-18s | %-20s%n", "Size (n)", "Avg Time (ms)", "Ratio (ns/element)");
+        System.err.println("-------------|--------------------|----------------------");
+
+
+
+        // Test with several increasing sizes of n
+        for (int n = 500; n <= 32000; n *= 2) {
+            // Suggest GC and sleep briefly to reduce interference between runs
+            System.gc();
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+
+            // 1. Create test data
+            List<Integer> goalList = IntStream.range(1, n + 1).boxed().collect(Collectors.toList());
+            List<Integer> initialList = new ArrayList<>(goalList);
+            Collections.shuffle(initialList, new Random(42)); // Use a fixed seed for reproducibility
+
+            String initialStr = initialList.stream().map(String::valueOf).collect(Collectors.joining(" "));
+            String goalStr = goalList.stream().map(String::valueOf).collect(Collectors.joining(" "));
+
+            ArrayCfg initialCfg = new ArrayCfg(initialStr);
+            ArrayCfg goalCfg = new ArrayCfg(goalStr);
+
+            // 2. Measure execution time
+            long startTime = System.nanoTime();
+            // Increase runs for more stable average, especially for small 'n'
+            int runs = (n < 4000) ? 100 : 50;
+            for (int i = 0; i < runs; i++) {
+                initialCfg.getH(goalCfg);
+            }
+            long endTime = System.nanoTime();
+
+            long totalDurationNanos = endTime - startTime;
+            double avgDurationNanos = (double) totalDurationNanos / runs;
+            double durationMs = avgDurationNanos / 1_000_000.0;
+
+            // 3. Calculate and print the ratio
+            double ratio = avgDurationNanos / n;
+            System.err.printf("%-12d | %-18.4f | %-20.4f%n", n, durationMs, ratio);
+        }
+        System.err.println("------------------------------------------------------\n");
+    }
 
 }
