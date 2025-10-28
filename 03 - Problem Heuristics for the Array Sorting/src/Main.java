@@ -38,8 +38,8 @@ public class Main {
             while(it.hasNext())
             {
                 i = it.next();
-                //System.out.print(i); // Imprime o estado atual (o layout)
-                //System.out.print(" -->  f*("+i.getSequenceId()+")  "+ i.getH() + "\n");
+                System.out.print(i); // Imprime o estado atual (o layout)
+                System.out.print(" -->  f*("+i.getSequenceId()+")  "+ i.getH() + "\n");
             }
             // Se for o último estado, imprime o custo total
                 if (!it.hasNext()) System.out.println((int)i.getG());

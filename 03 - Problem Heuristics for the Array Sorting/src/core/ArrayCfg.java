@@ -262,24 +262,19 @@ public final class ArrayCfg implements Ilayout {
          * <ul>
          *   <li><b>2-element cycles (k=2):</b>
          *       A single swap resolves the cycle. The exact and optimal cost of this swap is calculated.</li>
-         *
-         *   <li><b>Small cycles (k=3 or k=4):</b>
-         *       The number of swap sequences to resolve the cycle is small. A brute-force search is
-         *       performed to find the sequence of {@code k-1} swaps with the lowest real cost. This
-         *       guarantees an optimal heuristic for these subproblems.</li>
-         *
-         *   <li><b>Large cycles (k > 4):</b>
-         *       A brute-force search becomes computationally infeasible. A greedy and admissible
+         *   <li><b>Cycles of size k > 2:</b>
+         *       A greedy and admissible
          *       strategy is applied:
          *       <ul>
          *          <li><b>If the cycle contains even numbers:</b> The cheapest strategy is to use an even
          *              number as a "pivot". The cost is the sum of {@code (number of evens - 1)} even-even
          *              swaps (cost 2) and {@code (number of odds)} even-odd swaps (cost 11).</li>
          *          <li><b>If the cycle contains only odd numbers:</b> Two options are considered:
-         *              1) Resolve the cycle internally with {@code k-1} odd-odd swaps (cost 20 each).
-         *              2) "Borrow" an even number from outside the cycle, perform {@code k} even-odd swaps
-         *                 (cost 11 each), and then return the even number. The heuristic uses the minimum
-         *                 of {@code (k-1)*20} and {@code k*11}. If there are no even numbers in the array,
+         *              1) Resolve the cycle internally with {@code k-1} odd-odd swaps (cost 20 each).<br>
+         *              2) "Borrow" an even number from outside the cycle (if one exists), perform {@code k}
+         *                 even-odd swaps (cost 11 each), and then return the even number.
+         *              <br>The heuristic uses the minimum cost between these two options:
+         *                 {@code min((k-1)*20, k*11)}. If there are no even numbers in the array,
          *                 only the first option is possible.</li>
          *       </ul>
          *   </li>
@@ -304,17 +299,15 @@ public final class ArrayCfg implements Ilayout {
          * <li><b>Hybrid Cost Calculation:</b> The cost for resolving each cycle is estimated based on its size:
          * <ul>
          * <li><b>2-Cycles:</b> The exact cost of the single swap is calculated. This is optimal.</li>
-         * <li><b>Small Cycles (3-4 elements):</b> A brute-force search finds the true optimal cost for the subproblem.</li>
-         * <li><b>Large Cycles (>4 elements):</b> If the cycle contains an even number, it's used as a pivot. If the cycle is all-odd, the heuristic calculates the minimum cost between internal swaps and "borrowing" an external even number.</li>
+         * <li><b>Cycles with k > 2 elements:</b> If the cycle contains an even number, it's used as a pivot. If the cycle is all-odd, the heuristic calculates the minimum cost between internal swaps and "borrowing" an external even number.</li>
          * </ul>
          * </li>
          * </ol>
          * <p>
          * This heuristic is <b>admissible</b> because it never overestimates the true cost.
          * </p>
-         * <ul>
-         * <li><b>Time Complexity:</b> O(n). The cycle decomposition is O(n). The brute-force for small
-         *     cycles (k=3, k=4) runs in constant time as k is bounded by 4. All other parts are linear.</li>
+         * <li><b>Time Complexity:</b> O(n). The cycle decomposition and cost calculation for each cycle
+         *     are linear in the size of the array.</li>
          * <li><b>Space Complexity:</b> O(n). Primarily for the position map (`posMap`), the `targetIndex`
          *     array, and the `visited` array. The space for cycle lists is reused and bounded by n.</li>
          * </ul>
@@ -411,10 +404,8 @@ public final class ArrayCfg implements Ilayout {
 
             if (k == 2)
                 return calculateCost(cycleVals.get(0), cycleVals.get(1));
-            else if (k <= 4)
-                return costForSmallCycle(cycleVals, cycleGoalVals);
             else {
-                // Logic for large cycles (k > 4)
+                // Logic for cycles with k > 2
                 int evenCount = 0;
                 for (int v : cycleVals)
                     if ((v & 1) == 0) evenCount++;
@@ -436,95 +427,6 @@ public final class ArrayCfg implements Ilayout {
 
                 }
             }
-        }
-
-
-        /**
-         * Finds the minimal cost to resolve a small cycle by brute-forcing all valid swap sequences.
-         * <p>
-         * A sequence is valid if it consists of exactly (k-1) swaps and sorts the cycle.
-         * This method is optimized for small cycles (k=3 or k=4) and finds the true optimal cost.
-         * </p>
-         * <h3>Algorithm</h3>
-         * <p>
-         * A cycle of size k can be resolved with k-1 swaps. This method identifies a set of k-1
-         * swaps that are guaranteed to resolve the cycle (e.g., by using one element as a pivot).
-         * It then recursively explores all permutations of these k-1 swaps to find the sequence
-         * with the minimum possible cost. For k=4, this means exploring 3! = 6 permutations, which
-         * is vastly more efficient than naive brute-force.
-         * </p>
-         * <p>
-         * An aggressive pruning strategy is used: if the partial cost of a sequence already
-         * exceeds the best cost found so far, that entire branch of sequences is discarded.
-         * </p>
-         */
-        private static double costForSmallCycle(List<Integer> cycleVals, List<Integer> cycleGoalVals) {
-            final int k = cycleVals.size();
-            int[] initialCycleVals = cycleVals.stream().mapToInt(i -> i).toArray();
-            int[] goalVals = cycleGoalVals.stream().mapToInt(i -> i).toArray();
-
-            // Generate the k-1 swaps needed to resolve the cycle.
-            // A cycle (c1, c2, ..., ck) can be resolved by the swaps (c1,c2), (c1,c3), ..., (c1,ck).
-            // We will find the minimum cost by trying all permutations of these k-1 swaps.
-            List<int[]> swaps = new ArrayList<>();
-            for (int i = 1; i < k; i++) {
-                swaps.add(new int[]{0, i}); // Swaps relative to the first element's position
-            }
-
-            // Use a recursive helper to find the minimum cost permutation of swaps.
-            double minCost = findMinCostPermutation(initialCycleVals, goalVals, swaps, 0, 0.0, Double.POSITIVE_INFINITY);
-
-            if (minCost == Double.POSITIVE_INFINITY)
-            {
-                // This fallback should theoretically never be reached if the logic is correct,
-                // as a solution with k-1 swaps must exist. It's a safeguard.
-                throw new IllegalStateException("Brute-force for small cycle failed to find a solution.");
-            }
-
-            return minCost;
-        }
-
-        /**
-         * Recursively finds the minimum cost to sort the cycle by trying all permutations of the swaps.
-         * This implementation uses an in-place permutation algorithm (Heap's algorithm style) to avoid creating
-         * new lists in each recursive call, thus reducing memory allocation overhead.
-         */
-        private static double findMinCostPermutation(int[] currentVals, final int[] goalVals, List<int[]> swapsToPermute, int depth, double currentCost, double bestCost) {
-            // Pruning: if current cost is already higher than the best found, stop this path.
-            if (currentCost >= bestCost) {
-                return bestCost;
-            }
-
-            // Base case: no more swaps to perform.
-            if (depth == swapsToPermute.size()) {
-                // Check if this permutation of swaps correctly sorted the array.
-                if (Arrays.equals(currentVals, goalVals)) {
-                    return Math.min(currentCost, bestCost);
-                }
-                return bestCost; // This path did not lead to a solution.
-            }
-            
-            // Recursive step: iterate through the remaining swaps and try each one at the current depth.
-            for (int i = depth; i < swapsToPermute.size(); i++) {
-                // 1. Bring the i-th swap to the current position (depth)
-                Collections.swap(swapsToPermute, depth, i);
-                int[] swap = swapsToPermute.get(depth);
-                int p1 = swap[0];
-                int p2 = swap[1];
-
-                // 2. Apply the swap and calculate new cost
-                double swapCost = ArrayCfg.calculateCost(currentVals[p1], currentVals[p2]);
-                int[] nextVals = Arrays.copyOf(currentVals, currentVals.length); // Copy is still needed for state
-                int temp = nextVals[p1]; nextVals[p1] = nextVals[p2]; nextVals[p2] = temp;
-
-                // 3. Recurse to the next depth
-                bestCost = findMinCostPermutation(nextVals, goalVals, swapsToPermute, depth + 1, currentCost + swapCost, bestCost);
-
-                // 4. Backtrack: swap back to restore the list for the next iteration
-                Collections.swap(swapsToPermute, depth, i);
-            }
-
-            return bestCost;
         }
     }
 

@@ -5,7 +5,6 @@ import core.AStarSearch;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -562,6 +561,7 @@ public class AStarSearchTest {
         // Report time
         reportTime(startTime, endTime, "testCorrectness_Sample_9_elements");
     }
+    
 
     /**
      * Observational test to verify the linear time complexity O(n) of the heuristic calculation.
