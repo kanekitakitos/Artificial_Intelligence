@@ -3,7 +3,7 @@ package test;
 import math.Matrix;
 import apps.MLP23;
 import neural.MLP;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -21,10 +21,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @DisplayName("MLP Test for identifying digits 2 and 3")
 class TestMLP23 {
 
-    private MLP mlp;
-    private Matrix testX;
-    private Matrix testY;
-    private int seek = 12345;
+    private static MLP mlp;
+    private static Matrix testX;
+    private static Matrix testY;
+    private static int seek = 4;
 
 
     /**
@@ -32,7 +32,7 @@ class TestMLP23 {
      * The first 100 rows are images of the digit '2' (label 0).
      * The next rows are images of the digit '3' (label 1).
      */
-    private void loadData()
+    private static void loadData()
     {
         String testFile = "src/data/test.csv";
         List<double[]> featureList = new ArrayList<>(); // Changed from MLP to mlp
@@ -61,8 +61,8 @@ class TestMLP23 {
         testY = new Matrix(labelList.toArray(new double[0][]));
     }
 
-    @BeforeEach
-    void setUp() {
+    @BeforeAll
+    static void setUp() {
         // Load the test data
         loadData();
 
@@ -70,10 +70,13 @@ class TestMLP23 {
         MLP23 modelFactory = new MLP23(seek);
 
         // Caminhos para os seus arquivos de dados
-        String inputPath = "src/data/dataset.csv";
-        String outputPath = "src/data/labels.csv";
-        modelFactory.train(inputPath, outputPath);
-        this.mlp = modelFactory.getMLP();
+        String[] inputPaths = {
+                //"src/data/dataset.csv",
+                "src/data/dataset_apenas_novos.csv"
+        };
+        String[] outputPaths = {"src/data/labels.csv"};
+        modelFactory.train(inputPaths, outputPaths);
+        mlp = modelFactory.getMLP();
     }
 
     @Test
@@ -88,7 +91,8 @@ class TestMLP23 {
             for (int i = 0; i < testY.rows(); i++) {
                 Matrix inputRow = getRowAsMatrix(testX, i);
                 Matrix prediction = mlp.predict(inputRow);
-                long predictedLabel = Math.round(prediction.get(0, 0));
+                double rawPrediction = prediction.get(0, 0);
+                long predictedLabel = Math.round(rawPrediction);
                 double actualValue = testY.get(i, 0);
                 boolean isCorrect = predictedLabel == actualValue;
 
@@ -97,8 +101,8 @@ class TestMLP23 {
                 }
 
                 // Escreve o resultado de cada teste no arquivo
-                writer.printf("Índice: %-4d | Esperado: %.0f | Previsto: %d | Resultado: %s\n",
-                        i, actualValue, predictedLabel, isCorrect ? "CORRETO" : "INCORRETO");
+                writer.printf("Índice: %-4d | Esperado: %.0f | Previsto: %-25.17f | Resultado: %s\n",
+                        i, actualValue, rawPrediction, isCorrect ? "CORRETO" : "INCORRETO");
             }
 
             double accuracy = (double) correctPredictions / testY.rows();
@@ -119,8 +123,10 @@ class TestMLP23 {
         // Using the first image, which is a '2' (label 0)
         Matrix inputForTwo = getRowAsMatrix(testX, 0);
         Matrix prediction = mlp.predict(inputForTwo);
-        long predictedLabel = Math.round(prediction.get(0, 0));
+        double rawPrediction = prediction.get(0, 0);
+        long predictedLabel = Math.round(rawPrediction);
 
+        System.out.printf("Predição para '2' (esperado ~0.0): %.8f\n", rawPrediction);
         assertEquals(0, predictedLabel, "The MLP should predict '0' for an image of a '2'");
     }
 
@@ -130,8 +136,10 @@ class TestMLP23 {
         // Using the 101st image, which is a '3' (label 1)
         Matrix inputForThree = getRowAsMatrix(testX, 100);
         Matrix prediction = mlp.predict(inputForThree);
-        long predictedLabel = Math.round(prediction.get(0, 0));
+        double rawPrediction = prediction.get(0, 0);
+        long predictedLabel = Math.round(rawPrediction);
 
+        System.out.printf("Predição para '3' (esperado ~1.0): %.8f\n", rawPrediction);
         assertEquals(1, predictedLabel, "The MLP should predict '1' for an image of a '3'");
     }
 

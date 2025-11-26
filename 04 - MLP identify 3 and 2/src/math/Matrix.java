@@ -5,6 +5,7 @@ import java.util.Objects;
 import java.util.Random;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.stream.IntStream;
 
 /**
  * @author hdaniel@ualg.pt
@@ -70,11 +71,9 @@ public class Matrix {
     private Matrix traverse(Function<Double, Double> fnc) {
         Matrix result = new Matrix(rows, cols);
 
-        for (int i = 0; i < rows; i++) {
-            for (int j = 0; j < cols; j++) {
-                result.data[i][j] = fnc.apply(data[i][j]);
-            }
-        }
+        IntStream.range(0, rows).parallel().forEach(i -> {
+            Arrays.setAll(result.data[i], j -> fnc.apply(this.data[i][j]));
+        });
         return result;
     }
 
@@ -110,12 +109,9 @@ public class Matrix {
 
         Matrix result = new Matrix(rows, cols);
 
-        //add element by element
-        //store the result in matrix result
-        for (int i = 0; i < rows; i++) {
-            for (int j = 0; j < cols; j++)
-                result.data[i][j] = fnc.apply(this.data[i][j], other.data[i][j]);
-        }
+        IntStream.range(0, rows).parallel().forEach(i -> {
+            Arrays.setAll(result.data[i], j -> fnc.apply(this.data[i][j], other.data[i][j]));
+        });
         return result;
     }
 
@@ -141,24 +137,19 @@ public class Matrix {
 
     //sum all elements of the matrix
     public double sum() {
-        double total = 0.0;
-        for (int i = 0; i < rows; i++) {
-            for (int j = 0; j < cols; j++)
-                total += data[i][j];
-        }
-        return total;
+        // Paraleliza a soma de todos os elementos da matriz
+        return Arrays.stream(data).parallel().flatMapToDouble(Arrays::stream).sum();
     }
 
     //Sum by columns
     public Matrix sumColumns() {
         Matrix result = new Matrix(1, this.cols);
 
-        for (int j = 0; j < this.cols; j++) {
-            double sum = 0.0;
-            for (int i = 0; i < this.rows; i++)
-                sum += this.data[i][j];
+        IntStream.range(0, this.cols).parallel().forEach(j -> {
+            double sum = 0;
+            for(int i = 0; i < this.rows; i++) sum += this.data[i][j];
             result.data[0][j] = sum;
-        }
+        });
         return result;
     }
 
@@ -168,12 +159,10 @@ public class Matrix {
             throw new IllegalArgumentException("Incompatible sizes for adding row vector.");
         }
         Matrix result = new Matrix(this.rows, this.cols);
-        //add row vector to each row
-        for (int i = 0; i < this.rows; i++) {
-            for (int j = 0; j < this.cols; j++) {
-                result.data[i][j] = this.data[i][j] + rowVector.data[0][j];
-            }
-        }
+
+        IntStream.range(0, this.rows).parallel().forEach(i -> {
+            Arrays.setAll(result.data[i], j -> this.data[i][j] + rowVector.data[0][j]);
+        });
         return result;
     }
 
@@ -186,15 +175,15 @@ public class Matrix {
 
         Matrix result = new Matrix(this.rows, other.cols);
 
-        //multiply 2 matrices
-        //store the result in matrix result
-        for (int i = 0; i < this.rows; i++) {
+        IntStream.range(0, this.rows).parallel().forEach(i -> {
             for (int j = 0; j < other.cols; j++) {
+                double sum = 0;
                 for (int k = 0; k < this.cols; k++) {
-                    result.data[i][j] += this.data[i][k] * other.data[k][j];
+                    sum += this.data[i][k] * other.data[k][j];
                 }
+                result.data[i][j] = sum;
             }
-        }
+        });
         return result;
     }
 
@@ -207,13 +196,9 @@ public class Matrix {
     public Matrix transpose() {
         Matrix result = new Matrix(cols, rows);
 
-        //transpose the matrix
-        //store the result in matrix result
-        for (int i = 0; i < rows; i++) {
-            for (int j = 0; j < cols; j++) {
-                result.data[j][i] = data[i][j];
-            }
-        }
+        IntStream.range(0, rows).parallel().forEach(i -> {
+            for (int j = 0; j < cols; j++) result.data[j][i] = data[i][j];
+        });
         return result;
     }
 

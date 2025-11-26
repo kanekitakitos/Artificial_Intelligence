@@ -65,53 +65,45 @@ public class MLP {
     private Matrix backPropagation(Matrix X, Matrix y, double lr) {
         Matrix e = null;
         Matrix delta = null;
-
-        //back propagation using generalised delta rule
-        for (int l = numLayers-2; l >= 0; l--) {
-            if (l == numLayers-2) {                     //output layer
-                e = y.sub(yp[l + 1]);                   //e = y - yp[l+1]
-            }
-            else {                                      //propagate error to previous layer
-                // Propagate the error to the previous layer
+    
+        // back propagation using generalised delta rule
+        for (int l = numLayers - 2; l >= 0; l--) {
+            if (l == numLayers - 2) // output layer
+                e = y.sub(yp[l + 1]); // e = y – yp[l+1]
+            else { // propagate error
                 // e = delta * w[l+1]^T
-                e = delta.dot(w[l+1].transpose());
+                e = delta.dot(w[l + 1].transpose());
             }
-
-            // Compute the derivative of the activation function for the current layer's output
+    
             // dy = yp[l+1] .* (1-yp[l+1])
-            Matrix dy = yp[l+1].apply(act[l].derivative());
-            // Compute delta (local gradient)
+            // Note: to compute dy use Sigmoid class derivative
+            // in a similar way as in predict()
+            Matrix dy = yp[l + 1].apply(act[l].derivative());
+    
             // delta = e .* dy
             delta = e.mult(dy);
-
-            // Update weights and biases for the current layer
-            // w[l] += (yp[l]^T * delta) * lr
+    
+            // w[l] += yp[l]^T * delta * lr
             w[l] = w[l].add(yp[l].transpose().dot(delta).mult(lr));
-            // b[l] += sum of delta columns * lr
-            b[l] = b[l].add(delta.sumColumns().mult(lr));
+            // update biases
+            b[l] = b[l].addRowVector(delta.sumColumns().mult(lr));
         }
         return e;
     }
 
-
     public double[] train(Matrix X, Matrix y, double learningRate, int epochs) {
         int nSamples = X.rows();
         double[] mse = new double[epochs];
-
         for (int epoch=0; epoch < epochs; epoch++) {
-
-            //forward propagation
-            Matrix ypo = predict(X);
-
+            predict(X);
             //backward propagation
             Matrix e = backPropagation(X, y, learningRate);
-
             //mse
-            mse[epoch] = e.mult(e).sum() / nSamples;
+            mse[epoch] = e.dot(e.transpose()).get(0, 0) / nSamples;
 
-//            // Optional: Print progress to see the effect of the learning rate
-           if ((epoch + 1) % (epochs / 100) == 0) {
-                System.out.printf("Epoch %d/%d, MSE: %.6f\n", epoch + 1, epochs, mse[epoch]);
+            // Print progress
+            if ((epoch + 1) % (epochs / 100) == 0) {
+                System.out.printf("Epoch %d/%d, MSE: %.50f\n", epoch + 1, epochs, mse[epoch]);
             }
         }
         return mse;
