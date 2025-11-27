@@ -69,13 +69,19 @@ public class MLP23 {
             }
 
             for (int i = 0; i < inputDataList.size(); i++) {
+                double[] currentInput = inputDataList.get(i);
+                // Normalizar a entrada para o intervalo [0, 1] dividindo por 255.0
+                for (int j = 0; j < currentInput.length; j++) {
+                    currentInput[j] /= 255.0;
+                }
+
                 double[] currentOutput = outputDataList.get(i);
                 if (currentOutput[0] == 2.0) {
                     currentOutput[0] = 0.0;
                 } else if (currentOutput[0] == 3.0) {
                     currentOutput[0] = 1.0;
                 }
-                combinedData.add(new DataPoint(inputDataList.get(i), currentOutput));
+                combinedData.add(new DataPoint(currentInput, currentOutput));
             }
         }
 
