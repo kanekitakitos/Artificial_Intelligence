@@ -17,7 +17,7 @@ public class MLP23 {
 
     private double lr = 0.006;
 
-    private int epochs = 5000;
+    private int epochs = 10000;
     private int[] topology = {400,4, 1};
     private IDifferentiableFunction[] functions = {new Sigmoid(),new Sigmoid(), new Sigmoid()};
     private MLP mlp;
@@ -85,8 +85,8 @@ public class MLP23 {
             }
         }
 
-        Collections.shuffle(combinedData, new Random(seek));
-        Collections.shuffle(combinedData, new Random(seek));
+        //Collections.shuffle(combinedData, new Random(seek));
+        //Collections.shuffle(combinedData, new Random(seek));
         double[][] shuffledInputs = new double[combinedData.size()][];
         double[][] shuffledOutputs = new double[combinedData.size()][];
         for (int i = 0; i < combinedData.size(); i++) {
