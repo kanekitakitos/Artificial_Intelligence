@@ -15,7 +15,7 @@ import neural.MLP;
 
 public class MLP23 {
 
-    private double lr = 0.0015;
+    private double lr = 0.006;
 
     private int epochs = 15000;
     private int[] topology = {400,1, 1};
@@ -58,19 +58,19 @@ public class MLP23 {
             throw new IllegalArgumentException("La cantidad de archivos de entrada debe ser igual a la cantidad de archivos de salida.");
         }
 
-        List<DataPoint> combinedData = new ArrayList<>();
+        List<DataPoint> trainingData = new ArrayList<>();
 
         for (int fileIndex = 0; fileIndex < inputPaths.length; fileIndex++) {
             List<double[]> inputDataList = loadData(inputPaths[fileIndex]);
             List<double[]> outputDataList = loadData(outputPaths[fileIndex]);
 
             if (inputDataList.size() != outputDataList.size()) {
-                throw new IllegalStateException("El archivo de entrada " + inputPaths[fileIndex] + " y el de salida " + outputPaths[fileIndex] + " no tienen el mismo número de líneas.");
+                throw new IllegalStateException("O ficheiro de entrada " + inputPaths[fileIndex] + " e o de saída " + outputPaths[fileIndex] + " não têm o mesmo número de linhas.");
             }
 
             for (int i = 0; i < inputDataList.size(); i++) {
                 double[] currentInput = inputDataList.get(i);
-                // Normalizar a entrada para o intervalo [0, 1] dividindo por 255.0
+                // Normalizar a entrada para o intervalo [0, 1]
                 for (int j = 0; j < currentInput.length; j++) {
                     currentInput[j] /= 255.0;
                 }
@@ -81,24 +81,79 @@ public class MLP23 {
                 } else if (currentOutput[0] == 3.0) {
                     currentOutput[0] = 1.0;
                 }
-                combinedData.add(new DataPoint(currentInput, currentOutput));
+                trainingData.add(new DataPoint(currentInput, currentOutput));
             }
         }
 
+        // 1. Carregar os dados de validação a partir dos ficheiros específicos
+        List<DataPoint> validationData = new ArrayList<>();
+        List<double[]> valInputList = loadData("src/data/test.csv");
+        List<double[]> valOutputList = loadData("src/data/labelstest.csv");
 
-        Collections.shuffle(combinedData, new Random(seek));
-        double[][] shuffledInputs = new double[combinedData.size()][];
-        double[][] shuffledOutputs = new double[combinedData.size()][];
-        for (int i = 0; i < combinedData.size(); i++) {
-            shuffledInputs[i] = combinedData.get(i).input;
-            shuffledOutputs[i] = combinedData.get(i).output;
+        for (int i = 0; i < valInputList.size(); i++) {
+            double[] currentInput = valInputList.get(i);
+            // Normalizar também a entrada da validação
+            for (int j = 0; j < currentInput.length; j++) {
+                currentInput[j] /= 255.0;
+            }
+
+            double[] currentOutput = valOutputList.get(i);
+            if (currentOutput[0] == 2.0) {
+                currentOutput[0] = 0.0;
+            } else if (currentOutput[0] == 3.0) {
+                currentOutput[0] = 1.0;
+            }
+            validationData.add(new DataPoint(currentInput, currentOutput));
         }
 
-        System.out.println("Iniciando o treinamento da rede...");
-        System.out.println("Amostras: " + shuffledInputs.length + " | LR: " + this.lr);
+        Collections.shuffle(trainingData, new Random(seek));
+        Matrix trainInputs = new Matrix(listTo2DArray(trainingData, true));
+        Matrix trainOutputs = new Matrix(listTo2DArray(trainingData, false));
+        Matrix valInputs = new Matrix(listTo2DArray(validationData, true));
+        Matrix valOutputs = new Matrix(listTo2DArray(validationData, false));
 
-        // Treino
-        mlp.train(new Matrix(shuffledInputs), new Matrix(shuffledOutputs), this.lr, this.epochs);
+        System.out.println("Iniciando o treinamento da rede...");
+        System.out.println("Amostras de Treino: " + trainingData.size() + " | Amostras de Validação: " + validationData.size());
+
+        // 2. Lógica de treino com learning rate adaptativo
+        double bestValidationError = Double.POSITIVE_INFINITY;
+        int epochsSinceLastErrorIncrease = 0;
+        final int patience = 100; // Número de épocas a esperar antes de reduzir o LR
+
+        for (int epoch = 1; epoch <= this.epochs; epoch++) {
+            // Treina por uma época
+            mlp.train(trainInputs, trainOutputs, this.lr, 1);
+
+            // A cada 10 épocas, calcula o erro de validação
+            if (epoch % 10 == 0) {
+                Matrix valPrediction = mlp.predict(valInputs); // Usar os dados de validação para prever
+                double currentValidationError = valOutputs.sub(valPrediction).apply(x -> x * x).sum() / validationData.size();
+
+                System.out.printf("Época: %d, LR: %.6f, Erro de Validação: %.6f\n", epoch, this.lr, currentValidationError);
+
+                if (currentValidationError < bestValidationError) {
+                    bestValidationError = currentValidationError;
+                    epochsSinceLastErrorIncrease = 0;
+                    // Opcional: Salvar o melhor modelo aqui
+                } else {
+                    epochsSinceLastErrorIncrease++;
+                }
+
+                // Se o erro de validação não melhora há 'patience' verificações, reduz o LR
+                if (epochsSinceLastErrorIncrease >= patience / 10) { // Dividido por 10 porque verificamos a cada 10 épocas
+                    this.lr *= 0.5; // Reduz a learning rate em 50%
+                    System.out.printf("!!! Erro de validação não melhorou. A reduzir LR para %.6f !!!\n", this.lr);
+                    epochsSinceLastErrorIncrease = 0; // Reset do contador
+                }
+
+                // Condição de paragem se a learning rate ficar muito pequena
+                if (this.lr < 1e-7) {
+                    System.out.println("Learning rate muito baixa. A parar o treino.");
+                    break;
+                }
+            }
+        }
+
         System.out.println("Treinamento concluído.");
 
         // Podes salvar os pesos aqui se quiseres
@@ -106,13 +161,25 @@ public class MLP23 {
 
     public MLP getMLP() { return this.mlp; }
 
+    // Método auxiliar para converter List<DataPoint> para double[][]
+    private double[][] listTo2DArray(List<DataPoint> dataPoints, boolean isInput) {
+        int numRows = dataPoints.size();
+        int numCols = isInput ? dataPoints.get(0).input.length : dataPoints.get(0).output.length;
+        double[][] array = new double[numRows][numCols];
+        for (int i = 0; i < numRows; i++) {
+            array[i] = isInput ? dataPoints.get(i).input : dataPoints.get(i).output;
+        }
+        return array;
+    }
+
+
     public static void main(String[] args) {
         // Passa uma seed para garantir reprodutibilidade
         MLP23 model = new MLP23();
 
 
         String[] inputPaths = {
-                "//src/data/dataset.csv",
+                "src/data/dataset.csv",
                 //"src/data/dataset_apenas_novos.csv"
         };
         String[] outputPaths = {"src/data/labels.csv"};
@@ -150,7 +217,8 @@ public class MLP23 {
 
             double[][] testInput = new double[1][400];
             for (int j = 0; j < stringValues.length; j++) {
-                testInput[0][j] = Double.parseDouble(stringValues[j].trim()) ;
+                // IMPORTANTE: Normalizar também os dados de teste!
+                testInput[0][j] = Double.parseDouble(stringValues[j].trim()) / 255.0;
             }
 
             Matrix prediction = model.getMLP().predict(new Matrix(testInput));
