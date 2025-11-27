@@ -116,67 +116,6 @@ public class MLP {
         return clone;
     }
 
-    /**
-     * Treina a rede com early stopping para evitar overfitting.
-     *
-     * @param X Matriz de treino (entradas).
-     * @param y Matriz de treino (saídas esperadas).
-     * @param validationX Matriz de validação (entradas).
-     * @param validationY Matriz de validação (saídas esperadas).
-     * @param learningRate A taxa de aprendizagem.
-     * @param epochs O número máximo de épocas.
-     * @param patience O número de épocas a esperar sem melhoria antes de parar.
-     * @return Array com a evolução do erro (MSE) de treino e validação.
-     */
-    public double[][] train(Matrix X, Matrix y, Matrix validationX, Matrix validationY, double learningRate, int epochs, int patience) {
-        int nSamples = X.rows();
-        int nValidationSamples = validationX.rows();
-        double[][] mseHistory = new double[epochs][2]; // [0] para treino, [1] para validação
-        final double momentum = 0.9;
-
-        double bestValidationMse = Double.POSITIVE_INFINITY;
-        int epochsWithoutImprovement = 0;
-
-        Matrix[] bestW = null;
-        Matrix[] bestB = null;
-
-        for (int epoch = 0; epoch < epochs; epoch++) {
-            predict(X);
-            Matrix trainError = backPropagation(X, y, learningRate, momentum);
-            double trainMse = trainError.dot(trainError.transpose()).get(0, 0) / nSamples;
-
-            Matrix validationPrediction = predict(validationX);
-            Matrix validationError = validationY.sub(validationPrediction);
-            double validationMse = validationError.dot(validationError.transpose()).get(0, 0) / nValidationSamples;
-
-            mseHistory[epoch][0] = trainMse;
-            mseHistory[epoch][1] = validationMse;
-
-            if ((epoch + 1) % 100 == 0)
-                System.out.printf("Epoch %d/%d, Train MSE: %.10f, Validation MSE: %.10f\n", epoch + 1, epochs, trainMse, validationMse);
-
-            if (validationMse < bestValidationMse) {
-                bestValidationMse = validationMse;
-                epochsWithoutImprovement = 0;
-                bestW = cloneMatrices(this.w);
-                bestB = cloneMatrices(this.b);
-            } else {
-                epochsWithoutImprovement++;
-            }
-
-            if (epochsWithoutImprovement >= patience) {
-                System.out.printf("\nEarly stopping at epoch %d. Best validation MSE: %.10f\n", epoch + 1, bestValidationMse);
-                this.setWeights(bestW);
-                this.setBiases(bestB);
-                // Retorna apenas a parte do histórico que foi preenchida
-                return java.util.Arrays.copyOf(mseHistory, epoch + 1);
-            }
-        }
-        this.setWeights(bestW);
-        this.setBiases(bestB);
-        return mseHistory;
-    }
-
     public double[] train(Matrix X, Matrix y, double learningRate, int epochs) {
         int nSamples = X.rows();
         double[] mse = new double[epochs];
@@ -190,7 +129,7 @@ public class MLP {
             mse[epoch] = e.dot(e.transpose()).get(0, 0) / nSamples;
 
             // Print progress
-            if ((epoch + 1) % 50 == 0) {
+            if ((epoch + 1) % 100 == 0) {
                 System.out.printf("Epoch %d/%d, MSE: %.50f\n", epoch + 1, epochs, mse[epoch]);
             }
         }
