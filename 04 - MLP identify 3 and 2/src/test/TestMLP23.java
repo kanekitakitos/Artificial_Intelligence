@@ -71,7 +71,7 @@ class TestMLP23 {
         // Caminhos para os seus arquivos de dados
         String[] inputPaths = {
                 //"src/data/dataset.csv",
-                "src/data/datasetNew.csv",
+                "src/data/datasetExtreme.csv",
                 //"src/data/dataset_apenas_novos.csv",
                 //"src/data/dataset_apenas_novos2.csv",
         };
@@ -112,7 +112,7 @@ class TestMLP23 {
             writer.printf("\nAcurácia Final: %.2f%%\n", accuracy * 100);
 
             // Assert que a acurácia seja maior que um certo limiar, por exemplo, 95%
-            assertTrue(accuracy > 0.95, "A acurácia do modelo deve ser maior que 95%");
+            assertTrue(accuracy > 0.96, "A acurácia do modelo deve ser maior que 95%");
         } catch (IOException e) {
             e.printStackTrace();
         }

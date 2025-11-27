@@ -116,10 +116,28 @@ public class MLP {
         return clone;
     }
 
+    public double[] train(Matrix X, Matrix y, double learningRate, int epochs,double momentum) {
+        int nSamples = X.rows();
+        double[] mse = new double[epochs];
+
+        for (int epoch=0; epoch < epochs; epoch++) {
+            predict(X);
+            //backward propagation
+            Matrix e = backPropagation(X, y, learningRate, momentum);
+            //mse
+            mse[epoch] = e.dot(e.transpose()).get(0, 0) / nSamples;
+
+            // Print progress
+            if ((epoch + 1) % 50 == 0) {
+                System.out.printf("Epoch %d/%d, MSE: %.50f\n", epoch + 1, epochs, mse[epoch]);
+            }
+        }
+        return mse;
+    }
     public double[] train(Matrix X, Matrix y, double learningRate, int epochs) {
         int nSamples = X.rows();
         double[] mse = new double[epochs];
-        final double momentum = 0.7; // Valor comum para momentum
+        double momentum = 0.7;
 
         for (int epoch=0; epoch < epochs; epoch++) {
             predict(X);
