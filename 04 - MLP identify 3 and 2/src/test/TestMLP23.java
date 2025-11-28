@@ -71,7 +71,7 @@ class TestMLP23 {
         // Caminhos para os seus arquivos de dados
         String[] inputPaths = {
                 //"src/data/dataset.csv",
-                "src/data/datasetExtreme.csv",
+                "src/data/datasetNew.csv",
                 //"src/data/dataset_apenas_novos.csv",
                 //"src/data/dataset_apenas_novos2.csv",
         };
@@ -86,6 +86,10 @@ class TestMLP23 {
         // Cria um arquivo para registrar os resultados detalhados do teste
         try (PrintWriter writer = new PrintWriter(new FileWriter("src/data/test_results.txt"))) {
             int correctPredictions = 0;
+            int truePositives = 0;
+            int falsePositives = 0;
+            int falseNegatives = 0;
+            int trueNegatives = 0;
             writer.println("--- Análise de Predição do Teste ---");
             writer.println("------------------------------------");
 
@@ -101,18 +105,49 @@ class TestMLP23 {
                     correctPredictions++;
                 }
 
+                // Calcula TP, FP, FN, TN (considerando '1' como a classe positiva)
+                if (predictedLabel == 1 && actualValue == 1) {
+                    truePositives++;
+                } else if (predictedLabel == 1 && actualValue == 0) {
+                    falsePositives++;
+                } else if (predictedLabel == 0 && actualValue == 1) {
+                    falseNegatives++;
+                } else if (predictedLabel == 0 && actualValue == 0) {
+                    trueNegatives++;
+                }
+
                 // Escreve o resultado de cada teste no arquivo
                 writer.printf("Índice: %-4d | Esperado: %.0f | Previsto: %-25.17f | Resultado: %s\n",
                         i, actualValue, rawPrediction, isCorrect ? "CORRETO" : "INCORRETO");
             }
 
             double accuracy = (double) correctPredictions / testY.rows();
-            System.out.printf("Model Accuracy: %.2f%%\n", accuracy * 100);
-            writer.println("------------------------------------");
-            writer.printf("\nAcurácia Final: %.2f%%\n", accuracy * 100);
 
-            // Assert que a acurácia seja maior que um certo limiar, por exemplo, 95%
-            assertTrue(accuracy > 0.96, "A acurácia do modelo deve ser maior que 95%");
+            // Calcula Precisão, Recall e F1-Score
+            double precision = (truePositives + falsePositives > 0) ? (double) truePositives / (truePositives + falsePositives) : 0.0;
+            double recall = (truePositives + falseNegatives > 0) ? (double) truePositives / (truePositives + falseNegatives) : 0.0;
+            double f1Score = (precision + recall > 0) ? 2 * (precision * recall) / (precision + recall) : 0.0;
+
+            // Imprime as métricas na consola
+            System.out.println("\n--- Métricas de Avaliação do Modelo ---");
+            System.out.printf("Acurácia: %.2f%%\n", accuracy * 100);
+            System.out.printf("Precisão: %.4f\n", precision);
+            System.out.printf("Recall (Sensibilidade): %.4f\n", recall);
+            System.out.printf("F1-Score: %.4f\n", f1Score);
+            System.out.println("---------------------------------------");
+
+            // Escreve as métricas no final do arquivo
+            writer.println("------------------------------------");
+            writer.println("\n--- Resumo das Métricas ---");
+            writer.printf("Acurácia Final: %.2f%%\n", accuracy * 100);
+            writer.printf("Precisão: %.4f\n", precision);
+            writer.printf("Recall: %.4f\n", recall);
+            writer.printf("F1-Score: %.4f\n", f1Score);
+            writer.printf("\nVerdadeiros Positivos (TP): %d\nFalsos Positivos (FP): %d\nVerdadeiros Negativos (TN): %d\nFalsos Negativos (FN): %d\n",
+                    truePositives, falsePositives, trueNegatives, falseNegatives);
+
+            // Assert que a acurácia seja maior que um certo limiar, por exemplo, 96.5%
+            assertTrue(accuracy > 0.965, "A acurácia do modelo deve ser maior que 95%");
         } catch (IOException e) {
             e.printStackTrace();
         }

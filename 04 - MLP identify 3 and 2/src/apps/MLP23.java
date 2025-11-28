@@ -14,7 +14,7 @@ public class MLP23 {
     private double lr = 0.022971;
 
     private int epochs = 5000;
-    private int epocht = 10;
+    private int epocht = 5;
     private double momentum = 0.7;
     private int[] topology = {400,1, 1};
     private IDifferentiableFunction[] functions = {new Sigmoid(), new Sigmoid()};
@@ -32,8 +32,8 @@ public class MLP23 {
         DataHandler dataHandler = new DataHandler(
                 inputPaths,
                 outputPaths,
-                "src/data/test.csv",
-                "src/data/labelstest.csv",
+                "src/data/datasetr.csv",
+                "src/data/labelsr.csv",
                 SEED
         );
 
@@ -82,7 +82,7 @@ public class MLP23 {
 
                         // Se o erro de validação não melhora, reduz o LR
                         if (epochsSinceLastErrorIncrease > 0 && epochsSinceLastErrorIncrease % (lrPatience / 10) == 0) {
-                            this.lr *= 0.20;
+                            this.lr *= 0.30;
                             //System.out.printf("!!! Erro de validação não melhorou. A reduzir LR para %.6f !!!\n", this.lr);
                             epochsSinceLastErrorIncrease = 0; // Reset do contador
                         }

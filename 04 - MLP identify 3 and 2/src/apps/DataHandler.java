@@ -143,6 +143,29 @@ public class DataHandler {
         return array;
     }
 
+    /**
+     * Carrega um conjunto de dados de teste a partir dos caminhos de ficheiro fornecidos.
+     * Este método não embaralha os dados, preservando a sua ordem original para avaliação.
+     *
+     * @param inputPath  O caminho para o ficheiro de inputs (features) do teste.
+     * @param outputPath O caminho para o ficheiro de outputs (labels) do teste.
+     * @return Um array de {@link Matrix} contendo as matrizes de input e output. O índice 0 contém os inputs e o índice 1 os outputs.
+     */
+    public static Matrix[] loadTestData(String inputPath, String outputPath) {
+        DataHandler handler = new DataHandler(new String[]{inputPath}, new String[]{outputPath}, 0.0, 0);
+        
+        // Como validationSplit é 0, todos os dados são carregados como dados de treino.
+        // Usamos getTrainInputs() e getTrainOutputs() para obter os dados carregados sem embaralhar.
+        // A lógica interna do construtor não embaralha se o validationSplit for 0 ou 1.
+        // No entanto, para maior clareza, o ideal seria ter um método de carregamento mais direto.
+        // Esta é uma forma de reutilizar a lógica existente.
+
+        Matrix testInputs = handler.getTrainInputs();
+        Matrix testOutputs = handler.getTrainOutputs();
+
+        return new Matrix[]{testInputs, testOutputs};
+    }
+
     public Matrix getTrainInputs() { return trainInputs; }
     public Matrix getTrainOutputs() { return trainOutputs; }
     public Matrix getValidationInputs() { return validationInputs; }
