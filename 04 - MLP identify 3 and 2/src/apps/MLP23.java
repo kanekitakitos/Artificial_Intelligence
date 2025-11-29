@@ -75,8 +75,8 @@ public class MLP23 {
 
     private int epochs = 5000;
     private int epocht = 5;
-    private double momentum = 0.6;
-    private int[] topology = {400,2, 1};
+    private double momentum = 0.8;
+    private int[] topology = {400,1, 1};
     private IDifferentiableFunction[] functions = {new Sigmoid(), new Sigmoid()};
     private MLP mlp;
     private static final int SEED = 4;
@@ -123,8 +123,8 @@ public class MLP23 {
         double bestValidationError = Double.POSITIVE_INFINITY;
         MLP bestMlp = null; // Para guardar o melhor modelo
         int epochsSinceLastErrorIncrease = 0;
-        final int lrPatience = 50; // Paciência para reduzir a learning rate (5 verificações)
-        final int earlyStoppingPatience = 200; // Paciência para parar o treino (20 verificações)
+        final int lrPatience = 20; // Paciência para reduzir a learning rate
+        final int earlyStoppingPatience = 50; // Paciência para parar o treino
 
         for (int epoch = 1; epoch <= this.epochs; epoch++) {
             this.mlp.train(trainInputs, trainOutputs, this.lr, epocht,momentum);
@@ -151,7 +151,7 @@ public class MLP23 {
 
                         // Se o erro de validação não melhora, reduz o LR
                         if (epochsSinceLastErrorIncrease > 0 && epochsSinceLastErrorIncrease % (lrPatience / 10) == 0) {
-                            this.lr *= 0.30;
+                            this.lr *= 0.50;
                             //System.out.printf("!!! Erro de validação não melhorou. A reduzir LR para %.6f !!!\n", this.lr);
                             epochsSinceLastErrorIncrease = 0; // Reset do contador
                         }

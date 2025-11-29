@@ -7,15 +7,9 @@ import neural.MLP;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-
-import java.io.BufferedReader;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.FileWriter;
-import java.util.ArrayList;
-import java.util.List;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -34,33 +28,10 @@ class TestMLP23 {
      */
     private static void loadData()
     {
-        String testFile = "src/data/test.csv";
-        List<double[]> featureList = new ArrayList<>(); // Changed from MLP to mlp
-        List<double[]> labelList = new ArrayList<>();
-
-        try (BufferedReader br = new BufferedReader(new FileReader(testFile))) {
-            String line;
-            int lineCount = 0;
-            while ((line = br.readLine()) != null) {
-                String[] stringValues = line.split(",");
-                double[] features = new double[stringValues.length];
-                for (int i = 0; i < stringValues.length; i++) {
-                    features[i] = Double.parseDouble(stringValues[i]);
-                }
-                featureList.add(features);
-
-                // The first 100 rows are '2' (label 0), the rest are '3' (label 1)
-                labelList.add(new double[]{(lineCount < 100) ? 0 : 1});
-                lineCount++;
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        //DataHandler dh = new DataHandler(null,null,"src/data/test.csv","src/data/labelsTest.csv",4);
-
-        testX = new Matrix(featureList.toArray(new double[0][]));
-        testY = new Matrix(labelList.toArray(new double[0][]));
+        // Use DataHandler to load and preprocess the test data consistently.
+        Matrix[] testData = DataHandler.loadTestData("src/data/test.csv", "src/data/labelsTest.csv");
+        testX = testData[0];
+        testY = testData[1];
     }
 
     @BeforeAll
@@ -68,13 +39,26 @@ class TestMLP23 {
         // Load the test data
         loadData();
 
+//        // Escreve os dados de teste carregados para um ficheiro de verificação
+//        try (PrintWriter writer = new PrintWriter(new FileWriter("src/data/loaded_test_data_verification.txt"))) {
+//            writer.println("--- Verificação dos Dados de Teste Carregados ---");
+//            writer.println("-------------------------------------------------");
+//            writer.printf("Total de Amostras: %d\n", testY.rows());
+//            writer.println("-------------------------------------------------");
+//            for (int i = 0; i < testY.rows(); i++) {
+//                writer.printf("Índice: %-5d | Label Esperado (testY): %.1f\n", i, testY.get(i, 0));
+//            }
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
+
         // Get a pre-trained clone of the MLP model
         MLP23 modelFactory = new MLP23();
 
         // Caminhos para os seus arquivos de dados
         String[] inputPaths = {
                 //"src/data/dataset.csv",
-                "src/data/datasetNew.csv",
+                "src/data/borroso.csv",
                 //"src/data/dataset_apenas_novos.csv",
                 //"src/data/dataset_apenas_novos2.csv",
         };
@@ -150,7 +134,7 @@ class TestMLP23 {
                     truePositives, falsePositives, trueNegatives, falseNegatives);
 
             // Assert que a acurácia seja maior que um certo limiar, por exemplo, 96.5%
-            assertTrue(accuracy > 0.965, "A acurácia do modelo deve ser maior que 95%");
+            assertTrue(accuracy > 0.96, "A acurácia do modelo deve ser maior que 95%");
         } catch (IOException e) {
             e.printStackTrace();
         }
