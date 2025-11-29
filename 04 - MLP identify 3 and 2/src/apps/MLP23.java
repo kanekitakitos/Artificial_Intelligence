@@ -1,7 +1,7 @@
 package apps;
 
 import math.Matrix;
-import neural.activation.*; // Mantém os imports de ativação
+import neural.activation.*;
 import neural.activation.IDifferentiableFunction;
 
 import java.util.concurrent.CompletableFuture;
@@ -71,22 +71,23 @@ import neural.MLP;
  */
 public class MLP23 {
 
-    private double lr = 0.022971;
+    private double lr = 0.0225;
 
-    private int epochs = 5000;
-    private int epocht = 5;
-    private double momentum = 0.8;
+    private int epochs = 80000;
+    private int internalEpochs = 1;
+    private double momentum = 0.80;
     private int[] topology = {400,1, 1};
     private IDifferentiableFunction[] functions = {new Sigmoid(), new Sigmoid()};
     private MLP mlp;
-    private static final int SEED = 4;
+    private static final int SEED = 4; //
 
     /**
      * Constructs the MLP trainer with a predefined network topology and activation functions.
      */
     public MLP23() {
-        this.mlp = new MLP(topology,
-               functions, SEED);
+        // A inicialização aleatória de pesos é feita dentro do construtor da MLP.
+        // A inicialização a zero foi removida para permitir que a rede aprenda.
+        this.mlp = new MLP(topology, functions, SEED);
     }
 
 
@@ -119,7 +120,7 @@ public class MLP23 {
         CompletableFuture<Double> validationFuture = null;
 
 
-        // 2. Lógica de treino (inalterada, mas agora usa dados do DataHandler)
+        // 2. Lógica de treino
         double bestValidationError = Double.POSITIVE_INFINITY;
         MLP bestMlp = null; // Para guardar o melhor modelo
         int epochsSinceLastErrorIncrease = 0;
@@ -127,7 +128,7 @@ public class MLP23 {
         final int earlyStoppingPatience = 50; // Paciência para parar o treino
 
         for (int epoch = 1; epoch <= this.epochs; epoch++) {
-            this.mlp.train(trainInputs, trainOutputs, this.lr, epocht,momentum);
+            this.mlp.train(trainInputs, trainOutputs, this.lr, internalEpochs,momentum);
 
             // A cada 10 épocas, calcula o erro de validação
             if (epoch % 10 == 0) { // A validação continua a ser feita a cada 10 épocas
@@ -151,8 +152,8 @@ public class MLP23 {
 
                         // Se o erro de validação não melhora, reduz o LR
                         if (epochsSinceLastErrorIncrease > 0 && epochsSinceLastErrorIncrease % (lrPatience / 10) == 0) {
-                            this.lr *= 0.50;
-                            //System.out.printf("!!! Erro de validação não melhorou. A reduzir LR para %.6f !!!\n", this.lr);
+                            this.lr *= 0.9; // Redução mais suave da learning rate para evitar saltos
+                            //this.momentum *= 0.9; // Reduz também o momentum para refinar a convergência
                             epochsSinceLastErrorIncrease = 0; // Reset do contador
                         }
                     } catch (Exception e) {
@@ -168,7 +169,7 @@ public class MLP23 {
                 }, validationExecutor);
 
                 // Condição de paragem se a learning rate ficar muito pequena
-                if (this.lr < 1e-7) {
+                if (this.lr < 1e-5) {
                     System.out.println("Learning rate muito baixa. A parar o treino.");
                     break;
                 }
