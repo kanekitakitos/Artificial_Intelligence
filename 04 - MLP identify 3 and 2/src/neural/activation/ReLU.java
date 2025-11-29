@@ -2,6 +2,12 @@ package neural.activation;
 
 import java.util.function.Function;
 
+
+/**
+
+ * @author Brandon Mejia
+ * @version 29/11/2023
+ */
 public class ReLU implements IDifferentiableFunction {
 
     @Override

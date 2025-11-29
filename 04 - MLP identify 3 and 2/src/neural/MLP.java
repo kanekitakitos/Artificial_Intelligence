@@ -5,7 +5,7 @@ import neural.activation.IDifferentiableFunction;
 import java.util.Random;
 
 /**
- * @author hdaniel@ualg.pt
+ * @author hdaniel@ualg.pt, Brandon Mejia
  * @version 202511052038
  */
 public class MLP {

@@ -1,5 +1,6 @@
 package test;
 
+import apps.DataHandler;
 import math.Matrix;
 import apps.MLP23;
 import neural.MLP;
@@ -55,6 +56,8 @@ class TestMLP23 {
         } catch (IOException e) {
             e.printStackTrace();
         }
+
+        //DataHandler dh = new DataHandler(null,null,"src/data/test.csv","src/data/labelsTest.csv",4);
 
         testX = new Matrix(featureList.toArray(new double[0][]));
         testY = new Matrix(labelList.toArray(new double[0][]));

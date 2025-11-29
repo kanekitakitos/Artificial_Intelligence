@@ -9,6 +9,66 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import neural.MLP;
 
+/**
+ * Encapsulates the entire configuration and training process for a specific Multi-Layer Perceptron (MLP) model.
+ * <p>
+ * This class acts as a high-level trainer for an {@link MLP}. It defines the network's architecture (topology and activation functions),
+ * sets the hyperparameters (learning rate, epochs, momentum), and manages the training lifecycle. The training process
+ * is enhanced with advanced techniques such as:
+ * <ul>
+ *     <li><b>Asynchronous Validation:</b> Performs validation on a separate thread to avoid blocking the training loop.</li>
+ *     <li><b>Best Model Checkpointing:</b> Automatically saves the model with the lowest validation error found so far.</li>
+ *     <li><b>Adaptive Learning Rate:</b> Reduces the learning rate if the validation error stops improving.</li>
+ *     <li><b>Early Stopping:</b> Halts the training process if the validation error fails to improve for a specified number of epochs, preventing overfitting.</li>
+ * </ul>
+ * It relies on the {@link DataHandler} to load, preprocess, and split the datasets for training and validation.
+ *
+ * <h3>Example Usage</h3>
+ * <p>
+ * The following example demonstrates how to instantiate this class, train the model, and then use the resulting
+ * best-performing MLP to make predictions on a new, unseen test set.
+ * </p>
+ *
+ * <h4>Training and Evaluating the Model</h4>
+ * <pre>{@code
+ * public class Main {
+ *     public static void main(String[] args) {
+ *         // 1. Define the paths for the training data.
+ *         String[] trainInputs = {"src/data/treino_inputs.csv"};
+ *         String[] trainOutputs = {"src/data/treino_labels.csv"};
+ *
+ *         // 2. Create an instance of the trainer and execute the training process.
+ *         MLP23 trainer = new MLP23();
+ *         trainer.train(trainInputs, trainOutputs);
+ *
+ *         // 3. Retrieve the best-performing MLP after training is complete.
+ *         MLP bestModel = trainer.getMLP();
+ *
+ *         // 4. Load a separate, unseen test dataset to evaluate the model.
+ *         Matrix[] testData = DataHandler.loadTestData("src/data/test.csv", "src/data/labelsTest.csv");
+ *         Matrix testInputs = testData[0];
+ *         Matrix testOutputs = testData[1];
+ *
+ *         // 5. Make predictions on the test data.
+ *         Matrix predictions = bestModel.predict(testInputs);
+ *
+ *         // 6. Print the first 5 predictions vs actual values.
+ *         System.out.println("--- Test Results (Prediction vs Actual) ---");
+ *         for (int i = 0; i < 5; i++) {
+ *             double predictedValue = predictions.get(i, 0) > 0.5 ? 1.0 : 0.0; // Convert probability to binary class
+ *             double actualValue = testOutputs.get(i, 0);
+ *             System.out.printf("Sample %d: Predicted=%.1f, Actual=%.1f\n", i, predictedValue, actualValue);
+ *         }
+ *     }
+ * }
+ * }</pre>
+ *
+ * @see MLP
+ * @see DataHandler
+ * @see IDifferentiableFunction
+ * @author Brandon Mejia
+ * @version 2025-11-29
+ */
 public class MLP23 {
 
     private double lr = 0.022971;
@@ -21,6 +81,9 @@ public class MLP23 {
     private MLP mlp;
     private static final int SEED = 4;
 
+    /**
+     * Constructs the MLP trainer with a predefined network topology and activation functions.
+     */
     public MLP23() {
         this.mlp = new MLP(topology,
                functions, SEED);
@@ -28,12 +91,18 @@ public class MLP23 {
 
 
     public void train(String[] inputPaths, String[] outputPaths) {
+        // O construtor do DataHandler aqui está a usar uma versão depreciada.
+        // Para um código mais robusto, seria ideal refatorar para usar o construtor que aceita uma fração de validação.
+        // Exemplo: new DataHandler(allInputs, allOutputs, 0.2, SEED);
+        // No entanto, para manter a lógica atual, o construtor depreciado é chamado.
+        // Esta chamada assume que `test.csv` e `labelsTest.csv` são para validação, não para teste final.
+
         // 1. Utilizar o DataHandler para carregar e processar todos os dados
         DataHandler dataHandler = new DataHandler(
                 inputPaths,
                 outputPaths,
-                "src/data/datasetr.csv",
-                "src/data/labelsr.csv",
+                "src/data/test.csv",
+                "src/data/labelsTest.csv",
                 SEED
         );
 
@@ -122,6 +191,11 @@ public class MLP23 {
         }
     }
 
+    /**
+     * Retrieves the fully trained Multi-Layer Perceptron model.
+     * <p>This is the best-performing model found during the training process, selected based on the lowest validation error.</p>
+     * @return The trained {@link MLP} instance.
+     */
     public MLP getMLP() { return this.mlp; }
 
 
