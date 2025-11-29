@@ -110,8 +110,13 @@ class TestMLP23 {
             writer.println("------------------------------------");
             writer.printf("\nAcurácia Final: %.2f%%\n", accuracy * 100);
 
+<<<<<<< Updated upstream
             // Assert que a acurácia seja maior que um certo limiar, por exemplo, 95%
             assertTrue(accuracy > 0.95, "A acurácia do modelo deve ser maior que 95%");
+=======
+            // Assert que a acurácia seja maior que um certo limiar, por exemplo, 96.5%
+            assertTrue(accuracy >= 0.975, "A acurácia do modelo deve ser maior que 95%");
+>>>>>>> Stashed changes
         } catch (IOException e) {
             e.printStackTrace();
         }
