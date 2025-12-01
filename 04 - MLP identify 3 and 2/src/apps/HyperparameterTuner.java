@@ -1,9 +1,6 @@
 package apps;
-
 import neural.activation.IDifferentiableFunction;
-import neural.activation.ReLU;
 import neural.activation.Sigmoid;
-import neural.activation.TanH;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
@@ -114,10 +111,12 @@ public class HyperparameterTuner {
      */
     private static final boolean USE_GPU = true;
 
-    private final int SEED = 4;
+    private final int SEED = 8;
 
     // --- Hiperparámetros para a busca ---
-    private final double[] learningRates = {0.01, 0.005, 0.001,0.02,0.03,0.1,0.002,0.022,0.003,0.0005,0.0001,0.0002};
+    private final double[] learningRates = {0.01,0.02,0.03,
+                                        0.005, 0.001,0.002,0.0225,0.0221,0.003
+                                        ,0.0005,0.0001,0.0002};
     private final double[] momentums = {0.6,0.7, 0.8, 0.9};
     private final int[][] topologies = {
             {400, 1, 1},
@@ -128,8 +127,8 @@ public class HyperparameterTuner {
     };
     private final IDifferentiableFunction[][] activationFunctions = {
             {new Sigmoid(), new Sigmoid()},
-            {new TanH(), new TanH()},
-            {new ReLU(), new Sigmoid()} // ReLU para camadas ocultas, Sigmoid para a saída
+            //{new TanH(), new TanH()},
+            //{new ReLU(), new Sigmoid()} // ReLU para camadas ocultas, Sigmoid para a saída
     };
 
     /**
@@ -175,6 +174,9 @@ public class HyperparameterTuner {
         Matrix trainInputs = dataHandler.getTrainInputs();
         Matrix trainOutputs = dataHandler.getTrainOutputs();
         Matrix[] testData = DataHandler.loadDefaultTestData();
+        System.out.printf("-> Datasets loaded: %d training samples, %d test samples.\n\n",
+                dataHandler.getTrainingDataSize(),
+                testData[0].rows());
 
         // Create all combinations of parameters to be tested.
         List<Callable<TuningResult>> tasks = new ArrayList<>();
@@ -205,12 +207,14 @@ public class HyperparameterTuner {
         final int numThreads;
         final String mode;
         if (USE_GPU) {
-            numThreads = 4;
-            mode = "GPU (Seguro, Serializado)";
-            System.out.println("Modo GPU ativado. Cada tarefa usará o poder de processamento paralelo da GPU.");
+            // Força a execução em série para garantir que cada tarefa tenha acesso exclusivo à VRAM da GPU.
+            // Correr várias tarefas de GPU em paralelo quase sempre causa erros de OutOfMemory.
+            numThreads = 3;
+            mode = "GPU (Foco Total, Serializado)";
+            System.out.println("Modo GPU ativado. As tarefas serão executadas uma a uma para maximizar o uso da GPU.");
         } else {
             numThreads = Runtime.getRuntime().availableProcessors(); // Usa todos os núcleos da CPU.
-            mode = "CPU (Paralelismo Máximo)";
+            mode = String.format("CPU (Paralelismo Máximo em %d núcleos)", numThreads);
             System.out.println("Modo CPU ativado. As tarefas serão distribuídas por todos os núcleos da CPU.");
         }
 
@@ -233,9 +237,9 @@ public class HyperparameterTuner {
             {
                 try {
                     // Wait for the next completed task, with a generous timeout.
-                    Future<TuningResult> future = completionService.poll(30, TimeUnit.MINUTES);
+                    Future<TuningResult> future = completionService.poll(20, TimeUnit.MINUTES);
                     if (future == null) {
-                        System.err.printf("\n[WARNING] A training trial timed out after 30 minutes and was cancelled. Skipping to the next one.\n");
+                        System.err.printf("\n[WARNING] A training trial timed out after 20 minutes and was cancelled. Skipping to the next one.\n");
                         continue; // Move to the next result
                     }
                     TuningResult result = future.get();
