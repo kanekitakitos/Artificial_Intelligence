@@ -1,6 +1,6 @@
 package apps;
 import neural.activation.IDifferentiableFunction;
-import neural.activation.Sigmoid;
+import neural.activation.*;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
@@ -114,15 +114,14 @@ public class HyperparameterTuner {
     private final int SEED = 8;
 
     // --- Hiperparámetros para a busca ---
-    private final double[] learningRates = {0.01,0.02,0.03,
+    private final double[] learningRates = {0.01,0.009,0.011,
                                         0.005, 0.001,0.002,0.0225,0.0221,0.003
                                         ,0.0005,0.0001,0.0002};
     private final double[] momentums = {0.6,0.7, 0.8, 0.9};
     private final int[][] topologies = {
             {400, 1, 1},
             {400, 2, 1},
-            {400, 3, 1},
-            {400, 4, 1}
+            //{400, 4, 1}
 
     };
     private final IDifferentiableFunction[][] activationFunctions = {
@@ -209,7 +208,7 @@ public class HyperparameterTuner {
         if (USE_GPU) {
             // Força a execução em série para garantir que cada tarefa tenha acesso exclusivo à VRAM da GPU.
             // Correr várias tarefas de GPU em paralelo quase sempre causa erros de OutOfMemory.
-            numThreads = 3;
+            numThreads = 4;
             mode = "GPU (Foco Total, Serializado)";
             System.out.println("Modo GPU ativado. As tarefas serão executadas uma a uma para maximizar o uso da GPU.");
         } else {
