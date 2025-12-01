@@ -42,7 +42,7 @@ import neural.MLP;
  *         trainer.train(trainInputs, trainOutputs);
  *
  *         // 3. Retrieve the best-performing MLP after training is complete.
- *         MLP bestModel = trainer.getMLP();
+ *         MLP bestModel = trainer.getBestMLP();
  *
  *         // 4. Load a separate, unseen test dataset to evaluate the model.
  *         Matrix[] testData = DataHandler.loadTestData("src/data/test.csv", "src/data/labelsTest.csv");
@@ -71,11 +71,11 @@ import neural.MLP;
  */
 public class MLP23 {
 
-    private double lr = 0.005;
+    private double lr = 0.0022;
 
     private int epochs = 100000;
-    private int internalEpochs = 1;
-    private double momentum = 0.90;
+    private int internalEpochs = 5;
+    private double momentum = 0.80;
     private int[] topology = {400,2, 1};
     private IDifferentiableFunction[] functions = {new Sigmoid(), new Sigmoid()};
     private MLP mlp;
@@ -100,30 +100,54 @@ public class MLP23 {
         this.mlp = new MLP(this.topology, this.functions, SEED);
     }
 
+    /**
+     * A high-level training method that orchestrates the entire process from file paths.
+     * <p>
+     * This method serves as a convenient entry point for training. It uses the {@link DataHandler}
+     * to load, preprocess, and split the data into training and validation sets before
+     * initiating the core training loop.
+     * </p>
+     */
+    public void train() {
+        // 1. Load and prepare the data using DataHandler
+        DataHandler dataManager = new DataHandler(SEED);
+        // 2. Call the core training method with the prepared matrices
+        train(dataManager.getTrainInputs(), dataManager.getTrainOutputs(), dataManager.getValidationInputs(), dataManager.getValidationOutputs());
+    }
 
-    public double train(String[] inputPaths, String[] outputPaths) {
-        // O construtor do DataHandler aqui está a usar uma versão depreciada.
-        // Para um código mais robusto, seria ideal refatorar para usar o construtor que aceita uma fração de validação.
-        // Exemplo: new DataHandler(allInputs, allOutputs, 0.2, SEED);
-        // No entanto, para manter a lógica atual, o construtor depreciado é chamado.
-        // Esta chamada assume que `test.csv` e `labelsTest.csv` são para validação, não para teste final.
+    /**
+     * A high-level training method that loads separate datasets for training and validation.
+     * <p>
+     * This overload is ideal when you have pre-separated files for training and validation.
+     * It uses the {@link DataHandler} to load and preprocess each dataset independently,
+     * without performing any data splitting.
+     * </p>
+     *
+     * @param trainInputPaths  An array of file paths for the input training data.
+     * @param trainOutputPaths An array of file paths for the corresponding training label data.
+     * @param valInputPath     The file path for the validation input data.
+     * @param valOutputPath    The file path for the validation label data.
+     */
+    public void train(String[] trainInputPaths, String[] trainOutputPaths, String valInputPath, String valOutputPath) {
+        // 1. Load and prepare the data using the DataHandler constructor for separate sets.
+        // Note: This constructor does not split the data; it loads train and validation sets from distinct files.
+        DataHandler dataManager = new DataHandler(trainInputPaths, trainOutputPaths, valInputPath, valOutputPath, SEED);
+        // 2. Call the core training method with the prepared matrices.
+        train(dataManager.getTrainInputs(), dataManager.getTrainOutputs(), dataManager.getValidationInputs(), dataManager.getValidationOutputs());
+    }
 
-        // 1. Utilizar o DataHandler para carregar e processar todos os dados
-        DataHandler dataHandler = new DataHandler(
-                inputPaths,
-                outputPaths,
-                "src/data/test.csv",
-                "src/data/labelsTest.csv",
-                SEED
-        );
-
-        Matrix trainInputs = dataHandler.getTrainInputs();
-        Matrix trainOutputs = dataHandler.getTrainOutputs();
-        Matrix valInputs = dataHandler.getValidationInputs();
-        Matrix valOutputs = dataHandler.getValidationOutputs();
-
+    /**
+     * Trains the MLP model using the provided training and validation datasets.
+     *
+     * @param trainInputs  The matrix of training input data.
+     * @param trainOutputs The matrix of training label data.
+     * @param valInputs    The matrix of validation input data.
+     * @param valOutputs   The matrix of validation label data.
+     * @return The best validation error (MSE) achieved during training.
+     */
+    public double train(Matrix trainInputs, Matrix trainOutputs, Matrix valInputs, Matrix valOutputs) {
         System.out.println("Iniciando o treinamento da rede...");
-        System.out.println("Amostras de Treino: " + dataHandler.getTrainingDataSize() + " | Amostras de Validação: " + dataHandler.getValidationDataSize());
+        System.out.println("Amostras de Treino: " + trainInputs.rows() + " | Amostras de Validação: " + valInputs.rows());
 
         // Executor para tarefas assíncronas de validação
         ExecutorService validationExecutor = Executors.newSingleThreadExecutor();
@@ -174,7 +198,7 @@ public class MLP23 {
                 final MLP modelCloneForValidation = this.mlp.clone();
                 validationFuture = CompletableFuture.supplyAsync(() -> {
                     Matrix valPrediction = modelCloneForValidation.predict(valInputs);
-                    return valOutputs.sub(valPrediction).apply(x -> x * x).sum() / dataHandler.getValidationDataSize();
+                    return valOutputs.sub(valPrediction).apply(x -> x * x).sum() / valInputs.rows();
                 }, validationExecutor);
 
                 // Condição de paragem se a learning rate ficar muito pequena
@@ -207,7 +231,7 @@ public class MLP23 {
      * <p>This is the best-performing model found during the training process, selected based on the lowest validation error.</p>
      * @return The trained {@link MLP} instance.
      */
-    public MLP getMLP() { return this.mlp; }
+    public MLP getBestMLP() { return this.mlp; }
 
 
 }

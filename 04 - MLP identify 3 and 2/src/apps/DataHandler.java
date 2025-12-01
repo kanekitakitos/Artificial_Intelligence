@@ -1,6 +1,7 @@
 package apps;
 
 import math.Matrix;
+import neural.MLP;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
@@ -9,70 +10,65 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-/**
- * A comprehensive utility class for managing and preprocessing datasets for machine learning models.
+/** A comprehensive data management utility for loading, preprocessing, and serving datasets.
  * <p>
- * This class serves a dual purpose. It can be instantiated to manage the entire lifecycle of a dataset,
- * including loading, shuffling, splitting into training and validation sets, and preprocessing. It also
- * provides static methods for common, one-off data handling tasks.
- *
- * <h3>1. Instance-Based Dataset Management</h3>
- * <p>
- * When instantiated, {@code DataHandler} takes multiple input and output file paths and orchestrates them into
- * ready-to-use training and validation matrices. The process includes:
+ * This class centralizes all dataset handling logic, providing a single point of access for training,
+ * validation, and test data. It is designed to be instantiated with specific configurations
+ * (like the validation split ratio) and then serve ready-to-use matrices to the models.
+ * The file paths for the datasets are hardcoded as constants, promoting cleaner code in
+ * the training and tuning classes.
  * </p>
+ *
+ * <h3>Core Functionality</h3>
  * <ul>
- *   <li><b>Loading:</b> Reads data from multiple CSV files.</li>
- *   <li><b>Shuffling:</b> Randomizes the order of data points to prevent model bias.</li>
- *   <li><b>Splitting:</b> Divides the data into a training set and a smaller validation set based on a specified fraction.</li>
- *   <li><b>Preprocessing:</b> Applies normalization (e.g., scaling pixel values) and label encoding.</li>
+ *   <li><b>Centralized Path Management:</b> Default paths for training and test data are managed internally.</li>
+ *   <li><b>Automated Preprocessing:</b> Includes pixel value normalization (0-255 to 0-1) and label encoding.</li>
+ *   <li><b>Data Splitting:</b> Automatically shuffles and splits the full dataset into training and validation sets.</li>
+ *   <li><b>Static Loaders:</b> Provides a simple static method to load the default test set without needing an instance.</li>
  * </ul>
  *
- * <h4>Example: Loading and Splitting Data for Training</h4>
+ * <h3>Example: Training a Model with Default Data</h3>
+ * <p>
+ * To train a model, simply create a {@code DataHandler} instance and retrieve the necessary matrices.
+ * This decouples the model training logic from the specifics of data file locations.
+ * </p>
  * <pre>{@code
- * public class TrainModel {
- *     public static void main(String[] args) {
- *         String[] trainInputs = {"src/data/treino_inputs.csv"};
- *         String[] trainOutputs = {"src/data/treino_labels.csv"};
- *         double validationFraction = 0.2; // Use 20% of the data for validation
- *         int seed = 42;
+ * // 1. Instantiate DataHandler with a 20% validation split.
+ * DataHandler dataManager = new DataHandler(0.2, 42);
  *
- *         // 1. Create a DataHandler instance to manage the dataset.
- *         DataHandler dataManager = new DataHandler(trainInputs, trainOutputs, validationFraction, seed);
+ * // 2. Get the processed data matrices.
+ * Matrix trainInputs = dataManager.getTrainInputs();
+ * Matrix trainOutputs = dataManager.getTrainOutputs();
+ * Matrix validationInputs = dataManager.getValidationInputs();
+ * Matrix validationOutputs = dataManager.getValidationOutputs();
  *
- *         // 2. Retrieve the matrices for training and validation.
- *         Matrix trainData = dataManager.getTrainInputs();
- *         Matrix trainLabels = dataManager.getTrainOutputs();
- *         Matrix valData = dataManager.getValidationInputs();
- *         Matrix valLabels = dataManager.getValidationOutputs();
+ * // 3. Train the model.
+ * MLP mlp = new MLP(new int[]{400, 2, 1}, new IDifferentiableFunction[]{new Sigmoid(), new Sigmoid()});
+ * mlp.train(trainInputs, trainOutputs, 0.01, 100, 0.8);
  *
- *         // 3. (Proceed to train the model with these matrices...)
- *         // MLP mlp = new MLP(...);
- *         // mlp.train(trainData, trainLabels, ...);
- *     }
+ * // 4. Load test data for final evaluation.
+ * Matrix[] testSet = DataHandler.loadDefaultTestData();
+ * double accuracy = calculateAccuracy(mlp, testSet[0], testSet[1]);
  * }
  * }</pre>
  *
- * <h3>2. Static Utility Methods</h3>
- * <p>
- * The class also offers static methods for direct data manipulation without needing an instance. These are useful for
- * simple, standalone tasks like loading a dedicated test set.
- * </p>
- *
- * <h4>Example: Loading a Test Dataset</h4>
- * <pre>{@code
- * // Directly load input and output files into matrices without splitting.
- * Matrix[] testData = DataHandler.loadTestData("src/data/test_inputs.csv", "src/data/test_labels.csv");
- * Matrix testInputs = testData[0];
- * Matrix testOutputs = testData[1];
- * }</pre>
- *
- * @see neural.MLP
+ * @see MLP
  * @see Matrix
  * @author Brandon Mejia, hdaniel@ualg.pt
- * @version 2025-11-29
+ * @version 2025-11-30
  */
 public class DataHandler {
+
+    // --- Default File Paths ---
+    private static final String[] DEFAULT_INPUT_PATHS = {
+            "src/data/borroso.csv",
+            "src/data/dataset.csv"
+    };
+    private static final String[] DEFAULT_OUTPUT_PATHS = {
+            "src/data/labels.csv" // Reused for all input files
+    };
+    private static final String DEFAULT_TEST_INPUT_PATH = "src/data/test.csv";
+    private static final String DEFAULT_TEST_LABELS_PATH = "src/data/labelsTest.csv";
 
     private static class DataPoint {
         final double[] input;
@@ -81,12 +77,29 @@ public class DataHandler {
     }
 
 
-    private final Matrix trainInputs;
-    private final Matrix trainOutputs;
-    private final Matrix validationInputs;
-    private final Matrix validationOutputs;
+    private Matrix trainInputs;
+    private Matrix trainOutputs;
+    private Matrix validationInputs;
+    private Matrix validationOutputs;
     private int trainingDataSize;
     private int validationDataSize;
+
+    public DataHandler(int seed)
+    {
+        List<DataPoint> trainingData = loadAndProcess(DEFAULT_INPUT_PATHS, DEFAULT_OUTPUT_PATHS);
+        Collections.shuffle(trainingData, new Random(seed));
+        this.trainInputs = new Matrix(listTo2DArray(trainingData, true));
+        this.trainOutputs = new Matrix(listTo2DArray(trainingData, false));
+        this.trainingDataSize = trainingData.size();
+
+        List<DataPoint> validationData = loadAndProcess(new String[]{DEFAULT_TEST_INPUT_PATH}, new String[]{DEFAULT_TEST_LABELS_PATH});
+        this.validationInputs = new Matrix(listTo2DArray(validationData, true));
+        this.validationOutputs = new Matrix(listTo2DArray(validationData, false));
+        this.validationDataSize = validationData.size();
+
+    }
+
+
 
     /**
      * Constructor for loading separate training and validation/test sets.
@@ -108,12 +121,19 @@ public class DataHandler {
 
     /**
      * Creates a DataHandler by loading all data, shuffling it, and then splitting it
-     * into a training set and a validation/test set based on the provided ratio.
+     * into a training set and a validation set based on the provided ratio.
+     * <p>
+     * This constructor orchestrates the entire data preparation pipeline:
+     * <ol>
+     *   <li>Loads data from all specified file paths.</li>
+     *   <li><b>Shuffles the entire dataset</b> to ensure that training and validation sets are representative samples.</li>
+     *   <li>Splits the shuffled data into training and validation subsets according to the {@code validationSplit} ratio.</li>
+     *   <li>Converts these subsets into the final {@link Matrix} objects ready for model training.</li>
+     * </ol>
      *
      * @param allInputPaths   An array of paths to all input data files (CSV).
      * @param allOutputPaths  An array of paths to all output label files (CSV).
      * @param validationSplit The percentage of the data to be used for validation (e.g., 0.2 for 20%).
-     * @param seed            The seed for the random number generator to ensure reproducibility.
      */
     public DataHandler(String[] allInputPaths, String[] allOutputPaths, double validationSplit, int seed) {
         // 1. Load all data points from all files
@@ -121,22 +141,47 @@ public class DataHandler {
 
         // 2. Shuffle the entire dataset randomly
         //Collections.shuffle(allData, new Random(seed));
+        Collections.shuffle(allData, new Random(seed));
+        
+        if (validationSplit > 0.0) {
+            // 3. Split the data into training and validation sets
+            int validationSize = (int) (allData.size() * validationSplit);
+            this.validationDataSize = validationSize;
+            this.trainingDataSize = allData.size() - validationSize;
 
-        // 3. Split the data into training and validation sets
-        int validationSize = (int) (allData.size() * validationSplit);
-        this.validationDataSize = validationSize;
-        this.trainingDataSize = allData.size() - validationSize;
+            List<DataPoint> validationData = allData.subList(0, validationSize);
+            List<DataPoint> trainingData = allData.subList(validationSize, allData.size());
 
-        List<DataPoint> validationData = allData.subList(0, validationSize);
-        List<DataPoint> trainingData = allData.subList(validationSize, allData.size());
-
-        // 4. Convert to matrices
-        this.trainInputs = new Matrix(listTo2DArray(trainingData, true));
-        this.trainOutputs = new Matrix(listTo2DArray(trainingData, false));
-        this.validationInputs = new Matrix(listTo2DArray(validationData, true));
-        this.validationOutputs = new Matrix(listTo2DArray(validationData, false));
+            // 4. Convert to matrices
+            this.trainInputs = new Matrix(listTo2DArray(trainingData, true));
+            this.trainOutputs = new Matrix(listTo2DArray(trainingData, false));
+            this.validationInputs = new Matrix(listTo2DArray(validationData, true));
+            this.validationOutputs = new Matrix(listTo2DArray(validationData, false));
+        } else {
+            // If validationSplit is 0, use all data for training.
+            this.trainInputs = new Matrix(listTo2DArray(allData, true));
+            this.trainOutputs = new Matrix(listTo2DArray(allData, false));
+            this.validationInputs = new Matrix(new double[0][0]); // Empty matrix
+            this.validationOutputs = new Matrix(new double[0][0]); // Empty matrix
+        }
     }
 
+    /**
+     * Loads and preprocesses data from multiple file pairs in parallel.
+     * <p>
+     * This method is responsible for the core ETL (Extract, Transform, Load) logic:
+     * <ul>
+     *   <li><b>Extract:</b> Reads raw data from CSV files using parallel streams for efficiency.</li>
+     *   <li><b>Transform:</b>
+     *     <ul>
+     *       <li>Normalizes input features by scaling them from the [0, 255] range to [0, 1]. It intelligently
+     *           skips this step if the data already appears to be normalized (i.e., all values are <= 1.0).</li>
+     *       <li>Encodes output labels, mapping the target class (3.0) to 1.0 and other classes to 0.0.</li>
+     *     </ul>
+     *   </li>
+     *   <li><b>Load:</b> Aggregates the processed records into a unified list of {@code DataPoint} objects.</li>
+     * </ul>
+     */
     private List<DataPoint> loadAndProcess(String[] inputPaths, String[] outputPaths) {
         // Processa cada par de ficheiros em paralelo e recolhe as listas de DataPoints.
         return IntStream.range(0, inputPaths.length).parallel()
@@ -209,17 +254,16 @@ public class DataHandler {
      * Este método não embaralha os dados, preservando a sua ordem original para avaliação.
      *
      * @param inputPath  O caminho para o ficheiro de inputs (features) do teste.
-     * @param outputPath O caminho para o ficheiro de outputs (labels) do teste.
+     * @param labelsPath O caminho para o ficheiro de outputs (labels) do teste.
      * @return Um array de {@link Matrix} contendo as matrizes de input e output. O índice 0 contém os inputs e o índice 1 os outputs.
      */
-    public static Matrix[] loadTestData(String inputPath, String outputPath)
-    {
+    public static Matrix[] loadTestData(String inputPath, String labelsPath) {
         // 1. Carrega os dados brutos dos ficheiros CSV.
         List<double[]> inputs = loadCsv(inputPath);
-        List<double[]> outputs = loadCsv(outputPath);
+        List<double[]> outputs = loadCsv(labelsPath);
 
         if (inputs.size() != outputs.size()) {
-            throw new IllegalStateException("Ficheiro de input " + inputPath + " e ficheiro de output " + outputPath + " têm um número de linhas diferente.");
+            throw new IllegalStateException("Ficheiro de input " + inputPath);
         }
 
         // 2. Pré-processa os dados e cria os DataPoints.
@@ -243,6 +287,15 @@ public class DataHandler {
         Matrix testInputs = new Matrix(listTo2DArray(testData, true));
         Matrix testOutputs = new Matrix(listTo2DArray(testData, false));
         return new Matrix[]{testInputs, testOutputs};
+    }
+
+    /**
+     * Carrega o conjunto de dados de teste predefinido.
+     *
+     * @return Um array de {@link Matrix} onde o índice 0 é a matriz de inputs e o índice 1 é a de outputs.
+     */
+    public static Matrix[] loadDefaultTestData() {
+        return loadTestData(DEFAULT_TEST_INPUT_PATH, DEFAULT_TEST_LABELS_PATH);
     }
 
     public Matrix getTrainInputs() { return trainInputs; }

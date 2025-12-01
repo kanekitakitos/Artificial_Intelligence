@@ -238,4 +238,14 @@ public class Matrix {
     public int hashCode() {
         return Objects.hash(Arrays.deepHashCode(data), rows, cols);
     }
+
+
+    /**
+     * Returns the underlying 2D double array of the matrix.
+     * @return A 2D double array representing the matrix data.
+     */
+    public double[][] getData() {
+        return this.data;
+    }
+
 }

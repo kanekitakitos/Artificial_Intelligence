@@ -63,8 +63,8 @@ class TestMLP23 {
                 //"src/data/dataset_apenas_novos2.csv",
         };
         String[] outputPaths = {"src/data/labels.csv","src/data/labels.csv"};//,"src/data/labels.csv"};
-        modelFactory.train(inputPaths, outputPaths);
-        mlp = modelFactory.getMLP();
+        modelFactory.train();
+        //mlp = modelFactory.getMLP();
     }
 
     @Test
@@ -134,7 +134,7 @@ class TestMLP23 {
                     truePositives, falsePositives, trueNegatives, falseNegatives);
 
             // Assert que a acurácia seja maior que um certo limiar, por exemplo, 96.5%
-            assertTrue(accuracy > 0.96, "A acurácia do modelo deve ser maior que 95%");
+            assertTrue(accuracy >= 0.965, "A acurácia do modelo deve ser maior que 95%");
         } catch (IOException e) {
             e.printStackTrace();
         }

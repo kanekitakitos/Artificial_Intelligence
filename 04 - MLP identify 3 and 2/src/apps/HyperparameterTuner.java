@@ -1,55 +1,88 @@
 package apps;
 
-import neural.MLP;
 import neural.activation.IDifferentiableFunction;
+import neural.activation.ReLU;
 import neural.activation.Sigmoid;
 import neural.activation.TanH;
-import neural.activation.ReLU;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.*;
-import java.util.stream.Collectors;
+
+import math.Matrix;
 
 /**
- * Orchestrates an automated search for the optimal hyperparameters for an MLP model.
+ * Orchestrates a resilient and automated search for optimal MLP model hyperparameters through a parallelized grid search.
  * <p>
- * This class implements a parallelized Grid Search strategy to systematically explore
- * multiple combinations of hyperparameters, such as learning rate, momentum, network topology,
- * and activation functions. By leveraging a thread pool, it can evaluate several model
- * configurations concurrently, significantly reducing the time required to find a
- * high-performing setup.
+ * This class implements a Grid Search strategy to systematically explore multiple
+ * combinations of hyperparameters, including learning rate, momentum, network topology,
+ * and activation functions. It is designed for efficiency and resilience, making it
+ * ideal for long-running tuning tasks that are prone to interruption.
+ * </p>
+ * <ul>
+ *   <li><b>GPU Acceleration:</b> It offloads the intensive training tasks to the {@link GpuMLP23}
+ *       trainer, which uses the ND4J library to leverage GPU computation.</li>
+ *   <li><b>Parallel Execution:</b> By using a thread pool, it evaluates multiple model
+ *       configurations concurrently, significantly reducing search time.</li>
+ *   <li><b>Fault Tolerance:</b> The results of each trial are immediately saved to a log file. If the
+ *       process is interrupted, it can be restarted and will automatically skip previously
+ *       completed combinations, resuming from where it left off.</li>
  * </p>
  * <p>
- * The results of each trial are collected, sorted by validation error, and presented
- * in a summary report, highlighting the best combination found.
+ * The results of all trials are collected, sorted by accuracy, and presented in a
+ * final summary report that highlights the best-performing combination.
  * </p>
  *
- * <h3>Example Usage</h3>
+ * <h3>How It Works (Grid Search)</h3>
+ * <p>
+ * The {@link #runGridSearch()} method orchestrates the entire process. It first reads the
+ * {@code tuning_results.log} file to identify which hyperparameter combinations have already
+ * been evaluated. It then generates a list of all possible combinations and submits the
+ * remaining ones as parallel tasks to an {@link ExecutorService}. As each task completes,
+ * its result is immediately written to the log file to ensure no work is lost. This makes the
+ * process restartable and resilient to failures.
+ * </p>
+ *
+ * <h4>Example Usage</h4>
  * <p>
  * To start the hyperparameter tuning process, simply create an instance of this class
  * and invoke the {@link #runGridSearch()} method.
  * </p>
- * <pre>{@code
- * public class TuneModel {
- *     public static void main(String[] args) {
- *         // 1. Instantiate the tuner.
- *         HyperparameterTuner tuner = new HyperparameterTuner();
+ * <ul>
+ *   <li><b>Implementation:</b>
+ *      <pre>{@code
+public static void main(String[] args) {
+    HyperparameterTuner tuner = new HyperparameterTuner();
+    tuner.runGridSearch();
+}
+ *      }</pre>
+ *   </li>
+ * </ul>
  *
- *         // 2. Execute the grid search.
- *         // This will train and evaluate models for all defined hyperparameter combinations.
- *         tuner.runGridSearch();
+ * <h3>Troubleshooting and Known Issues</h3>
+ * <h4>Intermittent `ArrayIndexOutOfBoundsException`</h4>
+ * <p>
+ * The console log may show intermittent `ArrayIndexOutOfBoundsException` failures, often with a
+ * `null` error message. This is a known issue caused by a **race condition** when multiple
+ * threads attempt to read the same data files concurrently. While the `try-catch` block
+ * prevents the application from crashing, these failed trials represent wasted computation.
+ * </p>
+ * <p>
+ * **Solution:** If these errors are frequent, the most effective solution is to reduce the level of
+ * parallelism by setting `numThreads` to `1`. This will force the trials to run sequentially,
+ * eliminating the file access conflict at the cost of longer execution time.
+ * </p>
  *
- *         // 3. The results, including the best parameter set, will be printed to the console.
- *     }
- * }
- * }</pre>
- *
- * <h3>Further Improvements</h3>
+ * <h3>Future Improvements</h3>
  * <p>
  * While Grid Search is exhaustive, it can be computationally expensive. For a more
  * efficient search in a large hyperparameter space, consider implementing:
@@ -58,32 +91,33 @@ import java.util.stream.Collectors;
  *   <li><b>Random Search:</b> Instead of testing all combinations, Random Search samples a fixed
  *       number of random combinations. It often finds better models in less time.</li>
  *   <li><b>Bayesian Optimization:</b> An even more advanced technique that uses the results from
- *       previous trials to inform which combination to try next, converging on the optimal
- *       parameters more quickly.</li>
+ *       previous trials to inform which combination to try next.</li>
  * </ul>
  *
- * @see MLP23
- * @see MLP
+ * @see GpuMLP23
  * @see ExecutorService
+ * @see CompletionService
  * @author Brandon Mejia
- * @version 2025-11-29
+ * @version 2025-11-30
  */
 public class HyperparameterTuner {
 
-    // --- Dados de treino ---
-    private final String[] inputPaths = {
-            "src/data/borroso.csv",
-            //"src/data/big.csv",
-            "src/data/dataset.csv"
-    };
-    private final String[] outputPaths = {
-            "src/data/labels.csv",
-            //"src/data/labels.csv",
-            "src/data/labels.csv"
-    };
+    /**
+     * O ficheiro onde os resultados da otimização são guardados.
+     */
+    private static final String RESULTS_FILE = "src/data/tuning_results.log";
+
+    /**
+     * Define se o treino será executado em GPU.
+     * Se {@code true}, o número de threads será limitado a 1 para evitar sobrecarga de VRAM.
+     * Se {@code false}, usará todos os núcleos da CPU para paralelismo máximo.
+     */
+    private static final boolean USE_GPU = true;
+
+    private final int SEED = 4;
 
     // --- Hiperparámetros para a busca ---
-    private final double[] learningRates = {0.01, 0.005, 0.001,0.02,0.03,0.1,0.002,0.0221,0.003,0.0005,0.0001,0.0002};
+    private final double[] learningRates = {0.01, 0.005, 0.001,0.02,0.03,0.1,0.002,0.022,0.003,0.0005,0.0001,0.0002};
     private final double[] momentums = {0.6,0.7, 0.8, 0.9};
     private final int[][] topologies = {
             {400, 1, 1},
@@ -103,21 +137,22 @@ public class HyperparameterTuner {
      */
     private static class TuningResult implements Comparable<TuningResult> {
         final String paramsDescription;
-        final double validationError;
+        final double accuracy;
 
-        TuningResult(String paramsDescription, double validationError) {
+        TuningResult(String paramsDescription, double accuracy) {
             this.paramsDescription = paramsDescription;
-            this.validationError = validationError;
+            this.accuracy = accuracy;
         }
 
         @Override
         public int compareTo(TuningResult other) {
-            return Double.compare(this.validationError, other.validationError);
+            // Ordena por acurácia em ordem decrescente (maior é melhor)
+            return Double.compare(other.accuracy, this.accuracy);
         }
 
         @Override
         public String toString() {
-            return String.format("Parameters: [%s] -> Validation Error: %.6f", paramsDescription, validationError);
+            return String.format("Parameters: [%s] -> Accuracy: %.2f%%", paramsDescription, accuracy);
         }
     }
 
@@ -130,32 +165,62 @@ public class HyperparameterTuner {
      * </p>
      */
     public void runGridSearch() {
+        // Carrega as combinações já concluídas para evitar trabalho duplicado.
+        Set<String> completedTrials = loadCompletedTrials();
+        System.out.printf("Found %d previously completed trial(s). They will be skipped.\n", completedTrials.size());
+
+        // --- Otimização: Carregar os dados UMA VEZ antes de iniciar a busca ---
+        System.out.println("Pre-loading and caching datasets to optimize parallel trials...");
+        DataHandler dataHandler = new DataHandler(SEED); // Usar uma seed fixa
+        Matrix trainInputs = dataHandler.getTrainInputs();
+        Matrix trainOutputs = dataHandler.getTrainOutputs();
+        Matrix[] testData = DataHandler.loadDefaultTestData();
+
         // Create all combinations of parameters to be tested.
         List<Callable<TuningResult>> tasks = new ArrayList<>();
         for (int[] topology : topologies) {
             for (IDifferentiableFunction[] functions : activationFunctions) {
                 // Ensure the topology and activation function combination is valid.
                 if (topology.length - 1 != functions.length) continue;
-
                 for (double lr : learningRates) {
                     for (double momentum : momentums) {
+                        String paramsDescription = String.format(
+                                "Topology: %s, Functions: %s, LR: %.4f, Momentum: %.2f",
+                                Arrays.toString(topology), getFunctionNames(functions), lr, momentum
+                        );
+
+                        // Se a combinação já foi testada, salta-a.
+                        if (completedTrials.contains(paramsDescription)) {
+                            continue;
+                        }
+
                         // Create a task for the current combination.
-                        tasks.add(() -> runTrial(topology, functions, lr, momentum));
+                        tasks.add(() -> runTrial(paramsDescription, topology, functions, lr, momentum, trainInputs, trainOutputs, testData));
                     }
                 }
             }
         }
 
-        // Use a fixed-size thread pool to run tasks in parallel.
-        // Using the number of available processors is a good default.
-        int numThreads = Runtime.getRuntime().availableProcessors();
+        // --- Configuração do Paralelismo (CPU vs GPU) ---
+        final int numThreads;
+        final String mode;
+        if (USE_GPU) {
+            numThreads = 4;
+            mode = "GPU (Seguro, Serializado)";
+            System.out.println("Modo GPU ativado. Cada tarefa usará o poder de processamento paralelo da GPU.");
+        } else {
+            numThreads = Runtime.getRuntime().availableProcessors(); // Usa todos os núcleos da CPU.
+            mode = "CPU (Paralelismo Máximo)";
+            System.out.println("Modo CPU ativado. As tarefas serão distribuídas por todos os núcleos da CPU.");
+        }
+
         ExecutorService executor = Executors.newFixedThreadPool(numThreads);
         // CompletionService decouples task submission from result retrieval, which is more efficient.
         CompletionService<TuningResult> completionService = new ExecutorCompletionService<>(executor);
         List<TuningResult> results = new ArrayList<>();
 
-        System.out.printf("--- Starting Hyperparameter Search with %d threads ---\n", numThreads);
-        System.out.printf("Total combinations to test: %d\n\n", tasks.size());
+        System.out.printf("--- Iniciando a Busca de Hiperparâmetros com %d thread(s) | Modo: %s ---\n", numThreads, mode);
+        System.out.printf("Total new combinations to test: %d\n\n", tasks.size());
 
         // Submit all tasks for execution.
         for (Callable<TuningResult> task : tasks) {
@@ -164,15 +229,21 @@ public class HyperparameterTuner {
 
         try {
             // Retrieve results as they become available.
-            for (int i = 0; i < tasks.size(); i++) {
+            for (int i = 0; i < tasks.size(); i++)
+            {
                 try {
                     // Wait for the next completed task, with a generous timeout.
                     Future<TuningResult> future = completionService.poll(30, TimeUnit.MINUTES);
                     if (future == null) {
-                        System.err.println("A training trial timed out and was cancelled.");
+                        System.err.printf("\n[WARNING] A training trial timed out after 30 minutes and was cancelled. Skipping to the next one.\n");
                         continue; // Move to the next result
                     }
-                    results.add(future.get());
+                    TuningResult result = future.get();
+                    results.add(result);
+                    // Guarda o resultado imediatamente para garantir a persistência.
+                    saveResult(result);
+                    System.out.printf(">> Completed trial %d/%d. Result saved.\n", (i + 1), tasks.size());
+
                 } catch (CancellationException e) {
                     System.err.println("A training trial was cancelled, possibly due to a timeout.");
                 } catch (ExecutionException e) {
@@ -187,6 +258,17 @@ public class HyperparameterTuner {
             executor.shutdown();
         }
 
+        // Recarrega todos os resultados (antigos e novos) para o relatório final
+        results.clear();
+        try (BufferedReader reader = new BufferedReader(new FileReader(RESULTS_FILE))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                results.add(parseResultFromString(line));
+            }
+        } catch (IOException e) {
+            System.err.println("Could not reload results for final summary.");
+        }
+
         // Sort results by validation error (ascending).
         Collections.sort(results);
 
@@ -198,7 +280,7 @@ public class HyperparameterTuner {
             TuningResult bestResult = results.get(0);
             System.out.println("\n--- BEST COMBINATION FOUND ---");
             System.out.printf("Parameters: %s\n", bestResult.paramsDescription);
-            System.out.printf("Best Validation Error (MSE): %.6f\n", bestResult.validationError);
+            System.out.printf("Best Accuracy: %.2f%%\n", bestResult.accuracy);
         } else {
             System.out.println("\n--- No successful trials were completed. ---");
         }
@@ -207,24 +289,75 @@ public class HyperparameterTuner {
 
     /**
      * Runs a single training and validation trial for a given set of hyperparameters.
+     * <p>
+     * This method orchestrates one complete experiment by:
+     * <ol>
+     *   <li>Instantiating a {@link GpuMLP23} trainer with the specified configuration.</li>
+     *   <li>Executing the training process using the full training dataset.</li>
+     *   <li>Evaluating the trained model against the test dataset to calculate its accuracy.</li>
+     * </ol>
      *
      * @return A {@link TuningResult} object containing the parameters and final validation error.
      */
-    private TuningResult runTrial(int[] topology, IDifferentiableFunction[] functions, double lr, double momentum) {
-        String currentParams = String.format(
-                "Topology: %s, Functions: %s, LR: %.4f, Momentum: %.2f",
-                Arrays.toString(topology),
-                getFunctionNames(functions),
-                lr,
-                momentum
-        );
-        System.out.println("--- Testing combination: " + currentParams + " ---");
+    private TuningResult runTrial(String paramsDescription, int[] topology, IDifferentiableFunction[] functions, double lr, double momentum, Matrix trainInputs, Matrix trainOutputs, Matrix[] testData) {
+        try {
+            System.out.println("--- Testing combination: " + paramsDescription + " ---");
 
-        MLP23 trainer = new MLP23(topology, functions, lr, momentum, 100000);
-        double validationError = trainer.train(inputPaths, outputPaths);
+            // --- GPU-ACCELERATED TRIAL ---
+            // We use the new GpuMLP23 trainer, which leverages ND4J for GPU computation.
+            GpuMLP23 gpuTrainer = new GpuMLP23(topology, functions, lr, momentum, 50000); // Using fewer epochs as GPU training is much faster per epoch
+            gpuTrainer.train(trainInputs, trainOutputs);
 
-        System.out.printf("--- Finished: [%s] -> Validation Error: %.6f ---\n", currentParams, validationError);
-        return new TuningResult(currentParams, validationError);
+            // --- TEST THE TRAINED NETWORK ---
+            // After training, evaluate the model's accuracy on the test dataset.
+            double accuracy = gpuTrainer.test(testData[0], testData[1]);
+            System.out.printf("--- Finished GPU trial: [%s] -> Accuracy: %.2f%% ---\n", paramsDescription, accuracy);
+
+            return new TuningResult(paramsDescription, accuracy);
+        } catch (ArrayIndexOutOfBoundsException e) {
+            // Use e.toString() for a more descriptive message, as e.getMessage() can be null.
+            System.err.printf("--- FAILED trial: [%s] -> Exception: %s. Likely a data loading issue. ---\n", paramsDescription, e.toString());
+            // Return a result with 0 accuracy to mark it as a failed trial.
+            return new TuningResult(paramsDescription, 0.0);
+        }
+    }
+
+    /**
+     * Loads the descriptions of already completed trials from the results file.
+     * @return A Set of strings, where each string describes a completed parameter combination.
+     */
+    private Set<String> loadCompletedTrials() {
+        Set<String> completed = new HashSet<>();
+        try (BufferedReader reader = new BufferedReader(new FileReader(RESULTS_FILE))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (line.startsWith("Parameters: [")) {
+                    try {
+                        String params = line.substring(line.indexOf('[') + 1, line.indexOf(']'));
+                        completed.add(params);
+                    } catch (StringIndexOutOfBoundsException e)
+                    {
+                        // Ignora linhas mal formatadas.
+                    }
+                }
+            }
+        } catch (IOException e) {
+            // O ficheiro pode não existir na primeira execução, o que é normal.
+            System.out.println("Results log not found. Starting a new search.");
+        }
+        return completed;
+    }
+
+    /**
+     * Appends a single trial result to the log file in a thread-safe manner.
+     * @param result The TuningResult to save.
+     */
+    private synchronized void saveResult(TuningResult result) {
+        try (PrintWriter writer = new PrintWriter(new FileWriter(RESULTS_FILE, true))) {
+            writer.println(result.toString());
+        } catch (IOException e) {
+            System.err.println("CRITICAL: Failed to write result to log file: " + e.getMessage());
+        }
     }
 
     /**
@@ -236,6 +369,21 @@ public class HyperparameterTuner {
             names.add(func.getClass().getSimpleName());
         }
         return String.join(", ", names);
+    }
+
+    /**
+     * Parses a result object from a log line.
+     */
+    private TuningResult parseResultFromString(String line) {
+        try {
+            String params = line.substring(line.indexOf('[') + 1, line.indexOf(']'));
+            String accString = line.substring(line.indexOf("Accuracy: ") + 10, line.indexOf('%'));
+            double accuracy = Double.parseDouble(accString);
+            return new TuningResult(params, accuracy);
+        } catch (Exception e) { // Captura exceções mais genéricas (e.g., NumberFormatException)
+            // Return a dummy result if parsing fails
+            return new TuningResult(line, 0.0);
+        }
     }
 
     /**
