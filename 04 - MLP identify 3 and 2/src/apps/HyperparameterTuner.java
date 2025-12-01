@@ -117,10 +117,10 @@ public class HyperparameterTuner {
     private final double[] learningRates = {0.01,0.009,0.011,
                                         0.005, 0.001,0.002,0.0225,0.0221,0.003
                                         ,0.0005,0.0001,0.0002};
-    private final double[] momentums = {0.6 ,0.65, 0.63, 0.68};
+    private final double[] momentums = {0.6,0.7, 0.8, 0.9};
     private final int[][] topologies = {
             {400, 1, 1},
-            //{400, 2, 1},
+            {400, 2, 1},
             //{400, 4, 1}
 
     };

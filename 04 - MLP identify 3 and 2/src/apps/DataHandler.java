@@ -62,7 +62,7 @@ public class DataHandler {
     // --- Default File Paths ---
     private static final String[] DEFAULT_INPUT_PATHS = {
             "src/data/borroso.csv",
-            "src/data/bigRuido.csv",
+            "src/data/bigRuido2.csv",
             //"src/data/dataset.csv"
     };
     private static final String[] DEFAULT_OUTPUT_PATHS = {
