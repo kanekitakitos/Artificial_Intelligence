@@ -71,15 +71,16 @@ import neural.MLP;
  */
 public class MLP23 {
 
-    private double lr = 0.0022;
+    private double lr = 0.01;
 
+    // bigRuido and borroso
     private int epochs = 100000;
-    private int internalEpochs = 5;
-    private double momentum = 0.80;
+    private int internalEpochs = 1;
+    private double momentum = 0.60;
     private int[] topology = {400,2, 1};
     private IDifferentiableFunction[] functions = {new Sigmoid(), new Sigmoid()};
     private MLP mlp;
-    private static final int SEED = 4; // 2;4;5 5:00 ;7;8 4:21 ;16 4:17
+    private static final int SEED = 8; // 2;4;5 5:00 ;7;8 4:21 ;16 4:17
 
 
     /**
@@ -165,52 +166,67 @@ public class MLP23 {
             this.mlp.train(trainInputs, trainOutputs, this.lr, internalEpochs,momentum);
 
             // A cada 10 épocas, calcula o erro de validação
-            if (epoch % 10 == 0) { // A validação continua a ser feita a cada 10 épocas
+            if (epoch % 10 == 0)
+            {
                 // Espera que a validação anterior termine, se existir
-                if (validationFuture != null) {
+                if (validationFuture != null)
+                {
                     try {
                         double currentValidationError = validationFuture.get(); // Obtém o resultado do cálculo anterior
+
                         // Imprime o erro de validação (MSE) a cada 100 épocas para acompanhar o progresso.
-                        if ((epoch - 10) > 0 && (epoch - 10) % 100 == 0) {
+                        if ((epoch - 10) > 0 && (epoch - 10) % 100 == 0)
+                        {
             //                //System.out.printf("Época: %-5d | LR: %.6f | Erro de Validação (MSE): %.6f\n", epoch - 10, this.lr, currentValidationError);
                         }
 
-                        if (currentValidationError < bestValidationError) {
+                        if (currentValidationError < bestValidationError)
+                        {
                             bestValidationError = currentValidationError;
                             epochsSinceLastErrorIncrease = 0;
-                            //System.out.println(">> Novo melhor erro de validação encontrado. A guardar o modelo.");
-                            bestMlp = this.mlp.clone(); // Guarda uma cópia do melhor modelo encontrado
-                        } else {
-                            epochsSinceLastErrorIncrease++;
+
+                            // Guarda uma cópia do melhor modelo encontrado
+                            bestMlp = this.mlp.clone();
                         }
+                        else
+                            epochsSinceLastErrorIncrease++;
+
 
                         // Se o erro de validação não melhora, reduz o LR
-                        if (epochsSinceLastErrorIncrease > 0 && epochsSinceLastErrorIncrease % (lrPatience / 10) == 0) {
-                            this.lr *= 0.90; // Redução mais suave da learning rate para evitar saltos
+                        if (epochsSinceLastErrorIncrease > 0 && epochsSinceLastErrorIncrease % (lrPatience / 10) == 0)
+                        {
+                            // Redução mais suave da learning rate para evitar saltos
+                            // diminui o lr um 10%
+                            this.lr *= 0.90;
                             epochsSinceLastErrorIncrease = 0; // Reset do contador
                         }
-                    } catch (Exception e) {
+                    }
+                    catch (Exception e)
+                    {
                         e.printStackTrace();
                     }
                 }
 
                 // Lança a próxima validação de forma assíncrona
                 final MLP modelCloneForValidation = this.mlp.clone();
-                validationFuture = CompletableFuture.supplyAsync(() -> {
+                validationFuture = CompletableFuture.supplyAsync(() ->
+                {
                     Matrix valPrediction = modelCloneForValidation.predict(valInputs);
                     return valOutputs.sub(valPrediction).apply(x -> x * x).sum() / valInputs.rows();
                 }, validationExecutor);
 
-                // Condição de paragem se a learning rate ficar muito pequena
-                if (this.lr < 1e-5) {
+                // 2. Condição de paragem se a learning rate ficar muito pequena
+                if (this.lr < 1e-5)
+                {
                     //System.out.println("Learning rate muito baixa. A parar o treino.");
                     break;
                 }
                 // 3. Condição de Early Stopping
-                if (epochsSinceLastErrorIncrease >= earlyStoppingPatience / 10) {
+                if (epochsSinceLastErrorIncrease >= earlyStoppingPatience / 10)
+                {
                     //System.out.printf("\n--- Early Stopping ativado na época %d ---\n", epoch);
                     //System.out.println("O erro de validação não melhora há muito tempo.");
-                    break; // Para o loop de treino
+                    break;
                 }
             }
         }
@@ -219,10 +235,10 @@ public class MLP23 {
         System.out.println("Treinamento concluído.");
 
         // 4. Restaurar o melhor modelo que foi guardado
-        if (bestMlp != null) {
+        if (bestMlp != null)
             this.mlp = bestMlp;
             //System.out.printf("\nMelhor modelo restaurado (com erro de validação de: %.6f)\n", bestValidationError);
-        }
+
         return bestValidationError;
     }
 
@@ -231,7 +247,7 @@ public class MLP23 {
      * <p>This is the best-performing model found during the training process, selected based on the lowest validation error.</p>
      * @return The trained {@link MLP} instance.
      */
-    public MLP getBestMLP() { return this.mlp; }
+    public MLP getMLP() { return this.mlp; }
 
 
 }

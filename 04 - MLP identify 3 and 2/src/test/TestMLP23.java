@@ -19,52 +19,26 @@ class TestMLP23 {
     private static MLP mlp;
     private static Matrix testX;
     private static Matrix testY;
+    private static int seed = 8;
+    private static DataHandler dh = new DataHandler(seed);
 
 
-    /**
-     * Loads data from the CSV file.
-     * The first 100 rows are images of the digit '2' (label 0).
-     * The next rows are images of the digit '3' (label 1).
-     */
-    private static void loadData()
-    {
-        // Use DataHandler to load and preprocess the test data consistently.
-        Matrix[] testData = DataHandler.loadTestData("src/data/test.csv", "src/data/labelsTest.csv");
-        testX = testData[0];
-        testY = testData[1];
-    }
+
 
     @BeforeAll
-    static void setUp() {
+    static void setUp()
+    {
         // Load the test data
-        loadData();
+        // Use DataHandler to load and preprocess the test data consistently.
+        testX = dh.getTrainInputs();
+        testY = dh.getTrainOutputs();
 
-//        // Escreve os dados de teste carregados para um ficheiro de verificação
-//        try (PrintWriter writer = new PrintWriter(new FileWriter("src/data/loaded_test_data_verification.txt"))) {
-//            writer.println("--- Verificação dos Dados de Teste Carregados ---");
-//            writer.println("-------------------------------------------------");
-//            writer.printf("Total de Amostras: %d\n", testY.rows());
-//            writer.println("-------------------------------------------------");
-//            for (int i = 0; i < testY.rows(); i++) {
-//                writer.printf("Índice: %-5d | Label Esperado (testY): %.1f\n", i, testY.get(i, 0));
-//            }
-//        } catch (IOException e) {
-//            e.printStackTrace();
-//        }
 
         // Get a pre-trained clone of the MLP model
         MLP23 modelFactory = new MLP23();
 
-        // Caminhos para os seus arquivos de dados
-        String[] inputPaths = {
-                //"src/data/angle.csv",
-                "src/data/borroso.csv",
-                "src/data/dataset.csv",
-                //"src/data/dataset_apenas_novos2.csv",
-        };
-        String[] outputPaths = {"src/data/labels.csv","src/data/labels.csv"};//,"src/data/labels.csv"};
         modelFactory.train();
-        //mlp = modelFactory.getMLP();
+        mlp = modelFactory.getMLP();
     }
 
     @Test
