@@ -182,7 +182,8 @@ public class DataHandler {
      *   <li><b>Load:</b> Aggregates the processed records into a unified list of {@code DataPoint} objects.</li>
      * </ul>
      */
-    private List<DataPoint> loadAndProcess(String[] inputPaths, String[] outputPaths) {
+    private List<DataPoint> loadAndProcess(String[] inputPaths, String[] outputPaths)
+    {
         // Processa cada par de ficheiros em paralelo e recolhe as listas de DataPoints.
         return IntStream.range(0, inputPaths.length).parallel()
                 .mapToObj(i -> {
@@ -205,11 +206,9 @@ public class DataHandler {
                                 // Production-Ready Check: Only normalize if data appears to be in the [0, 255] pixel range.
                                 // This prevents re-normalizing already normalized data (e.g., from borroso.csv).
                                 boolean needsNormalization = Arrays.stream(input).anyMatch(val -> val > 1.0);
-                                if (needsNormalization) {
-                                    for (int k = 0; k < input.length; k++) {
+                                if (needsNormalization)
+                                    for (int k = 0; k < input.length; k++)
                                         input[k] /= 255.0;
-                                    }
-                                }
 
                                 double[] output = outputs.get(j);
                                 output[0] = (output[0] == 3.0) ? 1.0 : 0.0; // Converte 3.0 para 1.0, e o resto para 0.0
@@ -220,32 +219,38 @@ public class DataHandler {
                 .collect(Collectors.toList());
     }
 
-    private static List<double[]> loadCsv(String filePath) {
+    private static List<double[]> loadCsv(String filePath)
+    {
         List<double[]> data = new ArrayList<>();
-        try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
+        try (BufferedReader br = new BufferedReader(new FileReader(filePath)))
+        {
             String line;
-            while ((line = br.readLine()) != null) {
+            while ((line = br.readLine()) != null)
+            {
                 String[] stringValues = line.split(",");
                 double[] doubleValues = new double[stringValues.length];
-                for (int i = 0; i < stringValues.length; i++) {
+                for (int i = 0; i < stringValues.length; i++)
                     doubleValues[i] = Double.parseDouble(stringValues[i]);
-                }
+
                 data.add(doubleValues);
             }
-        } catch (IOException e) {
+        }
+        catch (IOException e)
+        {
             e.printStackTrace();
         }
         return data;
     }
 
-    private static double[][] listTo2DArray(List<DataPoint> dataPoints, boolean isInput) {
+    private static double[][] listTo2DArray(List<DataPoint> dataPoints, boolean isInput)
+    {
         if (dataPoints.isEmpty()) return new double[0][0];
         int numRows = dataPoints.size();
         int numCols = isInput ? dataPoints.get(0).input.length : dataPoints.get(0).output.length;
         double[][] array = new double[numRows][numCols];
-        for (int i = 0; i < numRows; i++) {
+        for (int i = 0; i < numRows; i++)
             array[i] = isInput ? dataPoints.get(i).input : dataPoints.get(i).output;
-        }
+
         return array;
     }
 
@@ -257,14 +262,15 @@ public class DataHandler {
      * @param labelsPath O caminho para o ficheiro de outputs (labels) do teste.
      * @return Um array de {@link Matrix} contendo as matrizes de input e output. O índice 0 contém os inputs e o índice 1 os outputs.
      */
-    public static Matrix[] loadTestData(String inputPath, String labelsPath) {
+    public static Matrix[] loadTestData(String inputPath, String labelsPath)
+    {
         // 1. Carrega os dados brutos dos ficheiros CSV.
         List<double[]> inputs = loadCsv(inputPath);
         List<double[]> outputs = loadCsv(labelsPath);
 
-        if (inputs.size() != outputs.size()) {
+        if (inputs.size() != outputs.size())
             throw new IllegalStateException("Ficheiro de input " + inputPath);
-        }
+
 
         // 2. Pré-processa os dados e cria os DataPoints.
         List<DataPoint> testData = IntStream.range(0, inputs.size()).parallel()
@@ -300,8 +306,8 @@ public class DataHandler {
 
     public Matrix getTrainInputs() { return trainInputs; }
     public Matrix getTrainOutputs() { return trainOutputs; }
-    public Matrix getValidationInputs() { return validationInputs; }
-    public Matrix getValidationOutputs() { return validationOutputs; }
+    public Matrix getTestInputs() { return validationInputs; }
+    public Matrix getTestOutputs() { return validationOutputs; }
     public int getTrainingDataSize() { return trainingDataSize; }
     public int getValidationDataSize() { return validationDataSize; }
 }

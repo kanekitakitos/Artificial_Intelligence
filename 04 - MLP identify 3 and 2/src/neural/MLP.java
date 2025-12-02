@@ -3,6 +3,10 @@ package neural;
 import math.Matrix;
 import neural.activation.IDifferentiableFunction;
 import java.util.Random;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * @author hdaniel@ualg.pt, Brandon Mejia
@@ -62,7 +66,8 @@ public class MLP {
     // also used to predict after training the net
     // yp[0] = X
     // yp[l+1] = Sigmoid( yp[l] * w[l]+b[l] )
-    public Matrix predict(Matrix X) {
+    public Matrix predict(Matrix X)
+    {
         yp[0] = X;
         for (int l = 0; l < numLayers - 1; l++)
             yp[l + 1] = yp[l].dot(w[l]).addRowVector(b[l]).apply(act[l].fnc());
@@ -116,11 +121,13 @@ public class MLP {
         return clone;
     }
 
-    public double[] train(Matrix X, Matrix y, double learningRate, int epochs,double momentum) {
+    public double[] train(Matrix X, Matrix y, double learningRate, int epochs,double momentum) 
+    {
         int nSamples = X.rows();
         double[] mse = new double[epochs];
 
-        for (int epoch=0; epoch < epochs; epoch++) {
+        for (int epoch=0; epoch < epochs; epoch++) 
+        {
             predict(X);
             //backward propagation
             Matrix e = backPropagation(X, y, learningRate, momentum);
@@ -152,6 +159,79 @@ public class MLP {
             }
         }
         return mse;
+    }
+
+    /**
+     * Trains the MLP model using training and validation datasets, incorporating advanced techniques.
+     * <p>
+     * This method orchestrates the entire training process, including:
+     * <ul>
+     *     <li><b>Asynchronous Validation:</b> Performs validation on a separate thread to avoid blocking the training loop.</li>
+     *     <li><b>Best Model Checkpointing:</b> Automatically saves the model with the lowest validation error found so far.</li>
+     * </ul>
+     *
+     * @param trainInputs  The matrix of training input data.
+     * @param trainOutputs The matrix of training label data.
+     * @param valInputs    The matrix of validation input data.
+     * @param valOutputs   The matrix of validation label data.
+     * @param lr           The learning rate.
+     * @param epochs       The total number of epochs to train for.
+     * @param momentum     The momentum factor for weight updates.
+     * @return The best validation error (MSE) achieved during training.
+     */
+    public double train(Matrix trainInputs, Matrix trainOutputs, Matrix valInputs, Matrix valOutputs, double lr, int epochs, double momentum)
+    {
+        System.out.println("Iniciando o treinamento da rede...");
+        System.out.println("Amostras de Treino: " + trainInputs.rows() + " | Amostras de Validação: " + valInputs.rows());
+
+        ExecutorService validationExecutor = Executors.newSingleThreadExecutor();
+        CompletableFuture<Double> validationFuture = null;
+
+        double bestValidationError = Double.POSITIVE_INFINITY;
+        final AtomicReference<MLP> bestMlp = new AtomicReference<>();
+
+        for (int epoch = 1; epoch <= epochs; epoch++)
+        {
+            // Perform one training step (could be multiple internal epochs, but here it's 1)
+            this.predict(trainInputs);
+            this.backPropagation(trainInputs, trainOutputs, lr, momentum);
+
+            if (epoch % 10 == 0) {
+                if (validationFuture != null) {
+                    try {
+                        double currentValidationError = validationFuture.get();
+
+                        if ((epoch - 10) > 0 && (epoch - 10) % 100 == 0) {
+                            System.out.printf("Época: %-5d | LR: %.6f | Erro de Validação (MSE): %.6f\n", epoch - 10, lr, currentValidationError);
+                        }
+
+                        if (currentValidationError < bestValidationError) {
+                            bestValidationError = currentValidationError;
+                            bestMlp.set(this.clone()); // Save a copy of the best model
+                        }
+
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+
+                final MLP modelCloneForValidation = this.clone();
+                validationFuture = CompletableFuture.supplyAsync(() -> {
+                    Matrix valPrediction = modelCloneForValidation.predict(valInputs);
+                    return valOutputs.sub(valPrediction).apply(x -> x * x).sum() / valInputs.rows();
+                }, validationExecutor);
+            }
+        }
+
+        validationExecutor.shutdown();
+        System.out.println("Treinamento concluído.");
+
+        if (bestMlp.get() != null) {
+            this.setWeights(bestMlp.get().getWeights());
+            this.setBiases(bestMlp.get().getBiases());
+        }
+
+        return bestValidationError;
     }
 
     /**

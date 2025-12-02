@@ -14,7 +14,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @DisplayName("MLP Test for identifying digits 2 and 3")
-class TestMLP23 {
+class TestMLP23
+{
 
     private static MLP mlp;
     private static Matrix testX;
@@ -22,18 +23,13 @@ class TestMLP23 {
     private static int seed = 8;
     private static DataHandler dh = new DataHandler(seed);
 
-
-
-
     @BeforeAll
     static void setUp()
     {
         // Load the test data
         // Use DataHandler to load and preprocess the test data consistently.
-        testX = dh.getTrainInputs();
-        testY = dh.getTrainOutputs();
-
-
+        testX = dh.getTestInputs();
+        testY = dh.getTestOutputs();
         // Get a pre-trained clone of the MLP model
         MLP23 modelFactory = new MLP23();
 
@@ -43,9 +39,11 @@ class TestMLP23 {
 
     @Test
     @DisplayName("Should achieve high accuracy on the test set")
-    void testModelAccuracy() {
+    void testModelAccuracy()
+    {
         // Cria um arquivo para registrar os resultados detalhados do teste
-        try (PrintWriter writer = new PrintWriter(new FileWriter("src/data/test_results.txt"))) {
+        try (PrintWriter writer = new PrintWriter(new FileWriter("src/data/test_results.txt")))
+        {
             int correctPredictions = 0;
             int truePositives = 0;
             int falsePositives = 0;
@@ -54,7 +52,8 @@ class TestMLP23 {
             writer.println("--- Análise de Predição do Teste ---");
             writer.println("------------------------------------");
 
-            for (int i = 0; i < testY.rows(); i++) {
+            for (int i = 0; i < testY.rows(); i++)
+            {
                 Matrix inputRow = getRowAsMatrix(testX, i);
                 Matrix prediction = mlp.predict(inputRow);
                 double rawPrediction = prediction.get(0, 0);

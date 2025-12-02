@@ -114,15 +114,17 @@ public class HyperparameterTuner {
     private final int SEED = 8;
 
     // --- Hiperparámetros para a busca ---
-    private final double[] learningRates = {0.01,0.009,0.011,
-                                        0.005, 0.001,0.002,0.0225,0.0221,0.003
-                                        ,0.0005,0.0001,0.0002};
+    private final double[] learningRates = {0.01//,0.009,0.011,
+                                        //0.005, 0.001,0.002,0.0225,0.0221,0.003
+                                        //,0.0005,0.0001,0.0002
+    };
 
-    private final double[] momentums = {0.6,0.65, 0.5, 0.55};
+    private final double[] momentums = {0.6//,0.65, 0.5, 0.55
+    };
 
     private final int[][] topologies = {
             {400, 1, 1},
-            {400, 2, 1},
+            //{400, 2, 1},
             //{400, 4, 1}
 
     };
@@ -210,7 +212,7 @@ public class HyperparameterTuner {
         if (USE_GPU) {
             // Força a execução em série para garantir que cada tarefa tenha acesso exclusivo à VRAM da GPU.
             // Correr várias tarefas de GPU em paralelo quase sempre causa erros de OutOfMemory.
-            numThreads = 4;
+            numThreads = 1;
             mode = "GPU (Foco Total, Serializado)";
             System.out.println("Modo GPU ativado. As tarefas serão executadas uma a uma para maximizar o uso da GPU.");
         } else {

@@ -244,3 +244,4 @@ Parameters: [Topology: [400, 2, 1], Functions: Sigmoid, Sigmoid, LR: 0,0300, Mom
 Parameters: [Topology: [400, 2, 1], Functions: Sigmoid, Sigmoid, LR: 0,0300, Momentum: 0,80] -> Accuracy: 90,50%
 //----------------------------- SEED 8 ----------------------------------------------------------------- bigRuido/borroso
 
+Parameters: [Topology: [400, 1, 1], Functions: Sigmoid, Sigmoid, LR: 0,0100, Momentum: 0,60] -> Accuracy: 98,50%

@@ -5,7 +5,6 @@ import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.factory.Nd4j;
 import org.nd4j.linalg.ops.transforms.Transforms;
 
-import java.util.Random;
 
 /**
  * A Multi-Layer Perceptron (MLP) implementation optimized for GPU computation using the ND4J library.
@@ -118,8 +117,6 @@ public class GpuMLP {
 
     private INDArray applyActivation(INDArray input, IDifferentiableFunction activation) {
         if (activation instanceof Sigmoid) return Transforms.sigmoid(input, true);
-        if (activation instanceof TanH) return Transforms.tanh(input, true);
-        if (activation instanceof ReLU) return Transforms.relu(input, true);
         throw new IllegalArgumentException("Unsupported activation function for GPU: " + activation.getClass().getSimpleName());
     }
 
@@ -149,17 +146,6 @@ public class GpuMLP {
             // f'(x) = sigmoid(x) * (1 - sigmoid(x))
             INDArray sig = Transforms.sigmoid(input, true);
             return sig.mul(sig.rsub(1.0)); // sig * (1 - sig)
-        }
-        if (activation instanceof TanH) {
-            // f'(x) = 1 - tanh(x)^2
-            INDArray tanh = Transforms.tanh(input, true);
-            // In-place reverse subtract (1.0 - element) for efficiency
-            return Transforms.pow(tanh, 2).rsubi(1.0);
-        }
-        if (activation instanceof ReLU) {
-            // f'(x) = 1 if x > 0, else 0
-            // Create a boolean mask and cast it to the current float data type (e.g., 1.0 or 0.0)
-            return input.gt(0).castTo(Nd4j.dataType());
         }
         throw new IllegalArgumentException("Unsupported activation function for GPU: " + activation.getClass().getSimpleName());
     }
