@@ -1,8 +1,10 @@
 package apps;
 
 import neural.GpuMLP;
+import neural.MLP;
 import math.Matrix;
 import neural.activation.IDifferentiableFunction;
+import neural.activation.Sigmoid;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.factory.Nd4j;
 import org.nd4j.linalg.ops.transforms.Transforms;
@@ -66,18 +68,22 @@ public class GpuMLP23 {
 
     /**
      * Executes the training process on the GPU using pre-loaded data.
-     * <p>This overload is optimized for hyperparameter tuning, as it avoids reloading
-     * data from disk on every trial.</p>
+     * <p>
+     * This overload is optimized for hyperparameter tuning, as it avoids reloading
+     * data from disk on every trial.
+     * </p>
      *
      * @param trainInputsMatrix The training input data as a {@link Matrix}.
      * @param trainOutputsMatrix The training output data as a {@link Matrix}.
      */
-    public void train(Matrix trainInputsMatrix, Matrix trainOutputsMatrix) {
+    public void train(Matrix trainInputsMatrix, Matrix trainOutputsMatrix, Matrix valInputsMatrix, Matrix valOutputsMatrix) {
         // Convert data to ND4J INDArrays
         INDArray trainInputs = Nd4j.create(trainInputsMatrix.getData()).castTo(Nd4j.dataType());
         INDArray trainOutputs = Nd4j.create(trainOutputsMatrix.getData()).castTo(Nd4j.dataType());
+        INDArray valInputs = Nd4j.create(valInputsMatrix.getData()).castTo(Nd4j.dataType());
+        INDArray valOutputs = Nd4j.create(valOutputsMatrix.getData()).castTo(Nd4j.dataType());
 
-        mlp.train(trainInputs, trainOutputs, this.lr, this.epochs, this.momentum);
+        mlp.train(trainInputs, trainOutputs, valInputs, valOutputs, this.lr, this.epochs, this.momentum);
     }
 
     /**
@@ -91,6 +97,7 @@ public class GpuMLP23 {
 
         return test(testData[0], testData[1]);
     }
+
 
     /**
      * Evaluates the trained network against a pre-loaded test dataset.

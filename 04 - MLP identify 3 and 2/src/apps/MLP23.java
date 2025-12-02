@@ -1,72 +1,60 @@
 package apps;
 
 import math.Matrix;
-import neural.activation.*;
 import neural.activation.IDifferentiableFunction;
+import neural.activation.Sigmoid;
 import neural.MLP;
 
 /**
- * Encapsulates the entire configuration and training process for a specific Multi-Layer Perceptron (MLP) model.
+ * A factory and trainer for a specific Multi-Layer Perceptron (MLP) model designed to classify handwritten digits '2' and '3'.
  * <p>
- * This class acts as a high-level trainer for an {@link MLP}. It defines the network's architecture (topology and activation functions),
- * sets the hyperparameters (learning rate, epochs, momentum), and manages the training lifecycle. The training process
- * is now encapsulated within the {@link MLP#train(Matrix, Matrix, Matrix, Matrix, double, int, double)} method,
- * which includes features like asynchronous validation and best-model checkpointing.
- * It relies on the {@link DataHandler} to load, preprocess, and split the datasets for training and validation.
+ * This class encapsulates a pre-defined MLP configuration, including its topology, activation functions, and hyperparameters
+ * like learning rate and momentum. It acts as a high-level trainer that simplifies the process of preparing and training
+ * the model by orchestrating the {@link DataHandler} for data loading and the {@link MLP} for the core training execution.
+ * </p>
+ * <p>
+ * The primary training logic, which includes asynchronous validation and best-model checkpointing, is handled by the
+ * {@link MLP#train(Matrix, Matrix, Matrix, Matrix, double, int, double)} method. This class serves as a convenient
+ * wrapper to instantiate and run that process with a proven configuration.
+ * </p>
  *
  * <h3>Example Usage</h3>
  * <p>
- * The following example demonstrates how to instantiate this class, train the model, and then use the resulting
- * best-performing MLP to make predictions on a new, unseen test set.
+ * This class is designed to be used programmatically as a factory for a trained model. The main application entry
+ * point is now in the {@code P4} class. The following example demonstrates how to use {@code MLP23} to get a
+ * trained model and use it for predictions.
  * </p>
  *
- * <h4>Training and Evaluating the Model</h4>
  * <pre>{@code
- * public class Main {
- *     public static void main(String[] args) {
- *         // 1. Define the paths for the training data.
- *         String[] trainInputs = {"src/data/treino_inputs.csv"};
- *         String[] trainOutputs = {"src/data/treino_labels.csv"};
+ * // 1. Instantiate the trainer factory.
+ * MLP23 trainer = new MLP23();
  *
- *         // 2. Create an instance of the trainer and execute the training process.
- *         MLP23 trainer = new MLP23();
- *         trainer.train(trainInputs, trainOutputs);
+ * // 2. Execute the training process. This loads and processes data automatically.
+ * trainer.train();
  *
- *         // 3. Retrieve the best-performing MLP after training is complete.
- *         MLP bestModel = trainer.getBestMLP();
+ * // 3. Retrieve the best-performing model after training.
+ * MLP bestModel = trainer.getMLP();
  *
- *         // 4. Load a separate, unseen test dataset to evaluate the model.
- *         Matrix[] testData = DataHandler.loadTestData("src/data/test.csv", "src/data/labelsTest.csv");
- *         Matrix testInputs = testData[0];
- *         Matrix testOutputs = testData[1];
- *
- *         // 5. Make predictions on the test data.
- *         Matrix predictions = bestModel.predict(testInputs);
- *
- *         // 6. Print the first 5 predictions vs actual values.
- *         System.out.println("--- Test Results (Prediction vs Actual) ---");
- *         for (int i = 0; i < 5; i++) {
- *             double predictedValue = predictions.get(i, 0) > 0.5 ? 1.0 : 0.0; // Convert probability to binary class
- *             double actualValue = testOutputs.get(i, 0);
- *             System.out.printf("Sample %d: Predicted=%.1f, Actual=%.1f\n", i, predictedValue, actualValue);
- *         }
- *     }
- * }
+ * // 4. Use the model to make a prediction on a new data sample.
+ * // (Assuming 'newImageMatrix' is a 1x400 Matrix).
+ * Matrix prediction = bestModel.predict(newImageMatrix);
+ * long label = Math.round(prediction.get(0, 0));
+ * System.out.println(label == 0 ? "Predicted: 2" : "Predicted: 3");
  * }</pre>
  *
  * @see MLP
  * @see DataHandler
  * @see IDifferentiableFunction
  * @author Brandon Mejia
- * @version 2025-11-29
+ * @version 2025-12-02
  */
 public class MLP23 {
 
-    private double lr = 0.01;
+    private double lr = 0.005;
 
     // bigRuido and borroso
     private int epochs = 20000;
-    private double momentum = 0.80;
+    private double momentum = 0.90;
     private int[] topology = {400,1, 1};
     private IDifferentiableFunction[] functions = {new Sigmoid(), new Sigmoid()};
     private MLP mlp;
@@ -79,15 +67,6 @@ public class MLP23 {
     public MLP23()
     {
         this.mlp = new MLP(topology, functions, SEED);
-    }
-
-    public MLP23(int[] topology, IDifferentiableFunction[] functions, double lr, double momentum, int epochs) {
-        this.topology = topology;
-        this.functions = functions;
-        this.lr = lr;
-        this.momentum = momentum;
-        this.epochs = epochs;
-        this.mlp = new MLP(this.topology, this.functions, SEED);
     }
 
     /**
@@ -127,6 +106,4 @@ public class MLP23 {
      * @return The trained {@link MLP} instance.
      */
     public MLP getMLP() { return this.mlp; }
-
-
 }

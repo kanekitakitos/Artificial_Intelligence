@@ -1,4 +1,5 @@
 package apps;
+import neural.GpuMLP;
 import neural.activation.IDifferentiableFunction;
 import neural.activation.*;
 
@@ -109,17 +110,19 @@ public class HyperparameterTuner {
      * Se {@code true}, o número de threads será limitado a 1 para evitar sobrecarga de VRAM.
      * Se {@code false}, usará todos os núcleos da CPU para paralelismo máximo.
      */
-    private static final boolean USE_GPU = true;
+    private static final boolean USE_GPU = false;
 
     private final int SEED = 8;
 
+    private final int epochs =20000;
+
     // --- Hiperparámetros para a busca ---
-    private final double[] learningRates = {0.01//,0.009,0.011,
-                                        //0.005, 0.001,0.002,0.0225,0.0221,0.003
-                                        //,0.0005,0.0001,0.0002
+    private final double[] learningRates = {0.01,0.009,0.011,
+                                        0.005, 0.001,0.002,0.0225,0.0221,0.003
+                                        ,0.0005,0.0001,0.0002
     };
 
-    private final double[] momentums = {0.6//,0.65, 0.5, 0.55
+    private final double[] momentums = {0.6,0.7, 0.8, 0.9 , 0.95, 0.99
     };
 
     private final int[][] topologies = {
@@ -240,9 +243,9 @@ public class HyperparameterTuner {
             {
                 try {
                     // Wait for the next completed task, with a generous timeout.
-                    Future<TuningResult> future = completionService.poll(20, TimeUnit.MINUTES);
+                    Future<TuningResult> future = completionService.poll(10, TimeUnit.MINUTES);
                     if (future == null) {
-                        System.err.printf("\n[WARNING] A training trial timed out after 20 minutes and was cancelled. Skipping to the next one.\n");
+                        System.err.printf("\n[WARNING] A training trial timed out after 10 minutes and was cancelled. Skipping to the next one.\n");
                         continue; // Move to the next result
                     }
                     TuningResult result = future.get();
@@ -311,13 +314,16 @@ public class HyperparameterTuner {
             System.out.println("--- Testing combination: " + paramsDescription + " ---");
 
             // --- GPU-ACCELERATED TRIAL ---
-            // We use the new GpuMLP23 trainer, which leverages ND4J for GPU computation.
-            GpuMLP23 gpuTrainer = new GpuMLP23(topology, functions, lr, momentum, 50000); // Using fewer epochs as GPU training is much faster per epoch
-            gpuTrainer.train(trainInputs, trainOutputs);
+            // Usamos o GpuMLP23, que é projetado para receber os hiperparâmetros e orquestrar o treino na GPU.
+            // O número de épocas é fixo aqui, mas poderia ser outro hiperparâmetro.
+
+            GpuMLP23 gpuTrainer = new GpuMLP23(topology, functions, lr, momentum, this.epochs);
+
+            gpuTrainer.train(trainInputs, trainOutputs, testData[0], testData[1]);
 
             // --- TEST THE TRAINED NETWORK ---
             // After training, evaluate the model's accuracy on the test dataset.
-            double accuracy = gpuTrainer.test(testData[0], testData[1]);
+            double accuracy = gpuTrainer.test();
             System.out.printf("--- Finished GPU trial: [%s] -> Accuracy: %.2f%% ---\n", paramsDescription, accuracy);
 
             return new TuningResult(paramsDescription, accuracy);

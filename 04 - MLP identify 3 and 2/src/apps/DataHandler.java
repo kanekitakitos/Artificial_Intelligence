@@ -67,7 +67,7 @@ public class DataHandler {
     private static final String[] DEFAULT_OUTPUT_PATHS = {
             "src/data/labels.csv" // Reused for all input files
     };
-    private static final String DEFAULT_TEST_INPUT_PATH = "src/data/test.csv";
+    private static final String DEFAULT_TEST_INPUT_PATH = "src/data/datasetTest.csv";
     private static final String DEFAULT_TEST_LABELS_PATH = "src/data/labelsTest.csv";
 
     private static class DataPoint {
