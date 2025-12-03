@@ -78,7 +78,7 @@ public class MLP {
     // back propagation
     private Matrix backPropagation(Matrix X, Matrix y, double lr, double momentum) {
         Matrix Eout = null;
-        Matrix e = null;
+        Matrix e;
         Matrix delta = null;
 
         // back propagation using generalised delta rule
@@ -135,9 +135,9 @@ public class MLP {
             mse[epoch] = e.dot(e.transpose()).get(0, 0) / nSamples;
 
             // Print progress
-            if ((epoch + 1) % 50 == 0) {
-                System.out.printf("Epoch %d/%d, MSE: %.50f\n", epoch + 1, epochs, mse[epoch]);
-            }
+//            if ((epoch + 1) % 50 == 0) {
+//                System.out.printf("Epoch %d/%d, MSE: %.50f\n", epoch + 1, epochs, mse[epoch]);
+//            }
         }
         return mse;
     }
@@ -154,9 +154,9 @@ public class MLP {
             mse[epoch] = e.dot(e.transpose()).get(0, 0) / nSamples;
 
             // Print progress
-            if ((epoch + 1) % 50 == 0) {
-                System.out.printf("Epoch %d/%d, MSE: %.50f\n", epoch + 1, epochs, mse[epoch]);
-            }
+//            if ((epoch + 1) % 50 == 0) {
+//                System.out.printf("Epoch %d/%d, MSE: %.50f\n", epoch + 1, epochs, mse[epoch]);
+//            }
         }
         return mse;
     }
@@ -181,8 +181,8 @@ public class MLP {
      */
     public double train(Matrix trainInputs, Matrix trainOutputs, Matrix valInputs, Matrix valOutputs, double lr, int epochs, double momentum)
     {
-        System.out.println("Iniciando o treinamento da rede...");
-        System.out.println("Amostras de Treino: " + trainInputs.rows() + " | Amostras de Validação: " + valInputs.rows());
+        //System.out.println("Iniciando o treinamento da rede...");
+        //System.out.println("Amostras de Treino: " + trainInputs.rows() + " | Amostras de Validação: " + valInputs.rows());
 
         ExecutorService validationExecutor = Executors.newSingleThreadExecutor();
         CompletableFuture<Double> validationFuture = null;
@@ -202,7 +202,7 @@ public class MLP {
                         double currentValidationError = validationFuture.get();
 
                         if ((epoch - 10) > 0 && (epoch - 10) % 100 == 0) {
-                            System.out.printf("Época: %-5d | LR: %.6f | Erro de Validação (MSE): %.6f\n", epoch - 10, lr, currentValidationError);
+                            //System.out.printf("Época: %-5d | LR: %.6f | Erro de Validação (MSE): %.6f\n", epoch - 10, lr, currentValidationError);
                         }
 
                         if (currentValidationError < bestValidationError) {
@@ -224,7 +224,7 @@ public class MLP {
         }
 
         validationExecutor.shutdown();
-        System.out.println("Treinamento concluído.");
+        //System.out.println("Treinamento concluído.");
 
         if (bestMlp.get() != null) {
             this.setWeights(bestMlp.get().getWeights());
