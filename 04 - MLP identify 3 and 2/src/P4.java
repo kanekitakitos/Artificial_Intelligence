@@ -31,10 +31,19 @@ public class P4 {
      * @throws IOException If an I/O error occurs while reading from the console.
      */
     public static void main(String[] args) throws IOException {
-        // 1. Create and train the model once.
-        MLP23 trainer = new MLP23();
-        trainer.train();
-        MLP mlp = trainer.getMLP();
+        // 1. Define o caminho para o modelo treinado.
+        // Este caminho deve ser o mesmo usado em MLP23.java para salvar o modelo.
+        String modelPath = "src/data/models/digit_classifier_v99_dataset_seed1.ser";
+        MLP mlp;
+
+        try {
+            mlp = MLP.loadModel(modelPath);
+        }
+        catch (IOException | ClassNotFoundException e) {
+            System.err.println("ERRO: Falha ao carregar o modelo. Verifique se o arquivo existe e se o treino foi executado antes.");
+            e.printStackTrace();
+            return; // Encerra a execução se o modelo não puder ser carregado.
+        }
 
         // 2. Read multiple lines from the console and predict each one.
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(System.in))) {

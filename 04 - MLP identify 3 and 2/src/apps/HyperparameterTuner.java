@@ -120,12 +120,10 @@ public class HyperparameterTuner {
                                         ,0.0005,0.0001,0.0002,0.00005,0.00001
     };
 
-    private final double[] momentums = {0.7, 0.8, 0.9 , 0.95, 0.99 , 1
-    };
+    private final double[] momentums = {0.7, 0.8, 0.9 , 0.95, 0.99 , 0.6};
 
     private final int[][] topologies = {
             {400, 1, 1},
-            {400, 2, 1},
             //{400, 4, 1}
 
     };
@@ -242,7 +240,7 @@ public class HyperparameterTuner {
                     TuningResult result = future.get();
                     results.add(result);
                     // Guarda o resultado imediatamente, mas apenas se a acurácia for superior a 90%.
-                    if (result.accuracy > 90.0) {
+                    if (result.accuracy > 95.0) {
                         saveResult(result);
                         System.out.printf(">> Completed trial %d/%d. Accuracy > 90%%. Result saved.\n", (i + 1), tasks.size());
                     } else {
@@ -313,7 +311,6 @@ public class HyperparameterTuner {
             // O número de épocas é fixo aqui, mas poderia ser outro hiperparâmetro.
 
             GpuMLP23 gpuTrainer = new GpuMLP23(topology, functions, lr, momentum, this.epochs);
-
             gpuTrainer.train(trainInputs, trainOutputs, testData[0], testData[1]);
 
             // --- TEST THE TRAINED NETWORK ---
@@ -339,7 +336,7 @@ public class HyperparameterTuner {
         try (BufferedReader reader = new BufferedReader(new FileReader(RESULTS_FILE))) {
             String line;
             while ((line = reader.readLine()) != null) {
-                if (line.startsWith("Parameters: [")) {
+                if (line.startsWith(SEED +" Parameters: [")) {
                     try {
                         String params = line.substring(line.indexOf('[') + 1, line.indexOf(']'));
                         completed.add(params);
@@ -360,9 +357,10 @@ public class HyperparameterTuner {
      * Appends a single trial result to the log file in a thread-safe manner.
      * @param result The TuningResult to save.
      */
-    private synchronized void saveResult(TuningResult result) {
+    private synchronized void saveResult(TuningResult result)
+    {
         try (PrintWriter writer = new PrintWriter(new FileWriter(RESULTS_FILE, true))) {
-            writer.println(result.toString());
+            writer.println(SEED + " " + result.toString());
         } catch (IOException e) {
             System.err.println("CRITICAL: Failed to write result to log file: " + e.getMessage());
         }

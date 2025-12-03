@@ -1,6 +1,12 @@
 package neural;
 
-import math.Matrix;
+import java.io.FileInputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
 import neural.activation.*;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.factory.Nd4j;
@@ -31,21 +37,22 @@ import java.util.concurrent.atomic.AtomicReference;
  * <ul>
  *   <li><b>GPU Acceleration:</b> All matrix operations are performed using ND4J's backend.</li>
  *   <li><b>API Parity:</b> Maintains method signatures consistent with the {@link MLP} class for seamless integration.</li>
- *   <li><b>Advanced Training:</b> Includes support for asynchronous validation and best-model checkpointing.</li>
+ *   <li><b>Advanced Training Loop:</b> Features asynchronous validation, best-model checkpointing, and adaptive learning rate scheduling.</li>
  *   <li><b>State Management:</b> Provides methods to get, set, and clone the model's weights and biases.</li>
  * </p>
  *
  * @see apps.GpuMLP23
  * @see INDArray
  * @author Brandon Mejia
- * @version 2025-11-30
+ * @version 2025-12-05
  */
-public class GpuMLP {
+public class GpuMLP implements Serializable {
 
+    private static final double MIN_LEARNING_RATE = 1e-9;
     private INDArray[] w;  // Weights for each layer
     private INDArray[] b;  // Biases for each layer
     private INDArray[] layerOutputs; // Outputs for each layer (yp)
-    private final IDifferentiableFunction[] activationFunctions;
+    private transient IDifferentiableFunction[] activationFunctions;
     private final int numLayers;
     private INDArray[] prevWUpdates; // For momentum
     private INDArray[] prevBUpdates; // For momentum
@@ -115,7 +122,7 @@ public class GpuMLP {
             if ((epoch + 1) % 100 == 0) {
                 INDArray error = y.sub(layerOutputs[numLayers - 1]);
                 double mse = error.mul(error).sumNumber().doubleValue() / X.rows();
-                System.out.printf("Época %d/%d, MSE: %.12f\n", epoch + 1, epochs, mse);
+                //System.out.printf("Época %d/%d, MSE: %.12f\n", epoch + 1, epochs, mse);
             }
         }
         System.out.println("Treinamento concluído.");
@@ -128,13 +135,17 @@ public class GpuMLP {
         ExecutorService validationExecutor = Executors.newSingleThreadExecutor();
         CompletableFuture<Double> validationFuture = null;
 
+        // --- Variáveis para o controlo do treino e da taxa de aprendizado ---
         double bestValidationError = Double.POSITIVE_INFINITY;
+        double currentLr = lr; // Taxa de aprendizado dinâmica
+        int patienceCounter = 0;
+        final int PATIENCE_THRESHOLD = 100; // Número de checagens sem melhoria antes de reduzir o LR
         final AtomicReference<GpuMLP> bestMlp = new AtomicReference<>();
 
         for (int epoch = 1; epoch <= epochs; epoch++) {
             // Perform one training step
             this.predict(trainInputs);
-            this.backPropagation(trainInputs, trainOutputs, lr, momentum);
+            this.backPropagation(trainInputs, trainOutputs, currentLr, momentum);
 
             // Asynchronous validation
             if (epoch % 10 == 0) {
@@ -143,17 +154,36 @@ public class GpuMLP {
                         double currentValidationError = validationFuture.get();
 
                         if ((epoch - 10) > 0 && (epoch - 10) % 100 == 0) {
-                            //System.out.printf("Época: %-5d | LR: %.6f | Erro de Validação (MSE): %.6f\n", epoch - 10, lr, currentValidationError);
+                            //System.out.printf("Época: %-5d | LR: %.6f | Erro de Validação (MSE): %.6f\n", epoch - 10, currentLr, currentValidationError);
                         }
 
                         if (currentValidationError < bestValidationError) {
                             bestValidationError = currentValidationError;
                             bestMlp.set(this.clone()); // Save a copy of the best model
+                            patienceCounter = 0; // Reset patience
+                        } else if (epoch > 5000) {
+                            // Se o erro não melhorou e já passamos da época 5000, incrementa a paciência.
+                            patienceCounter++;
+                        }
+
+                        // --- Lógica de Redução da Taxa de Aprendizado ---
+                        if (patienceCounter >= PATIENCE_THRESHOLD) {
+                            currentLr *= 0.95; // Reduz o LR em 5%
+                            //System.out.printf(">> Validação estagnada. Reduzindo a taxa de aprendizado para %.8f na época %d.\n", currentLr, epoch);
+                            patienceCounter = 0; // Reset patience after reducing LR
                         }
 
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
+                }
+
+                // --- Condição de Paragem por LR Mínimo ---
+                if (currentLr < MIN_LEARNING_RATE) {
+                    System.out.printf("\n>> Parando o treino na época %d. A taxa de aprendizado (%.10f) atingiu o limite mínimo.\n", epoch, currentLr);
+                    // Força a saída do loop de épocas definindo a época para o valor máximo.
+                    epoch = epochs + 1;
+                    continue; // Pula a submissão da próxima tarefa de validação
                 }
 
                 final GpuMLP modelCloneForValidation = this.clone();
@@ -176,6 +206,62 @@ public class GpuMLP {
 
         return bestValidationError;
     }
+
+    /**
+     * Saves the current state of the GPU-accelerated MLP model to a file.
+     *
+     * @param filePath The path to the file where the model will be saved (e.g., "src/data/models/gpumlp_model.ser").
+     * @throws IOException If an I/O error occurs during serialization.
+     */
+    public void saveModel(String filePath) throws IOException {
+        // ND4J arrays can be large; this ensures they are properly handled during serialization.
+        // For very large models, external serialization (Nd4j.write/read) might be more robust.
+        File modelFile = new File(filePath);
+        File parentDir = modelFile.getParentFile();
+
+        // Garante que o diretório pai exista. Se não existir, cria-o.
+        if (parentDir != null && !parentDir.exists()) {
+            parentDir.mkdirs();
+        }
+        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(modelFile))) {
+            oos.writeObject(this);
+            System.out.println("GPU Model saved successfully to " + filePath);
+        }
+    }
+
+    /**
+     * Loads a pre-trained GPU-accelerated MLP model from a file.
+     *
+     * @param filePath The path to the serialized model file.
+     * @return A new {@link GpuMLP} instance with the loaded state.
+     * @throws IOException            If an I/O error occurs during deserialization.
+     * @throws ClassNotFoundException If the class of the serialized object cannot be found.
+     */
+    public static GpuMLP loadModel(String filePath) throws IOException, ClassNotFoundException {
+        try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(filePath))) {
+            GpuMLP model = (GpuMLP) ois.readObject();
+            // It's good practice to ensure the arrays are on the correct device after loading,
+            // although ND4J usually handles this transparently.
+            System.out.println("GPU Model loaded successfully from " + filePath);
+            return model;
+        }
+    }
+
+    /**
+     * Custom deserialization method to re-initialize transient fields.
+     * This method is called automatically by the JVM during deserialization.
+     *
+     * @param in The ObjectInputStream to read data from.
+     * @throws IOException If an I/O error occurs.
+     * @throws ClassNotFoundException If the class of a serialized object cannot be found.
+     */
+    private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
+        in.defaultReadObject(); // Read all non-transient and non-static fields.
+        // Re-initialize the transient activationFunctions array.
+        this.activationFunctions = new IDifferentiableFunction[this.numLayers - 1];
+        for (int i = 0; i < this.activationFunctions.length; i++) this.activationFunctions[i] = new Sigmoid();
+    }
+
 
     private void backPropagation(INDArray X, INDArray y, double learningRate, double momentum) {
         INDArray delta = null;
@@ -297,6 +383,14 @@ public class GpuMLP {
         // Deep copy of weights and biases
         clonedMlp.setWeights(this.getWeights());
         clonedMlp.setBiases(this.getBiases());
+
+        // Clone momentum state
+        clonedMlp.prevWUpdates = new INDArray[this.prevWUpdates.length];
+        clonedMlp.prevBUpdates = new INDArray[this.prevBUpdates.length];
+        for (int i = 0; i < this.prevWUpdates.length; i++) {
+            clonedMlp.prevWUpdates[i] = this.prevWUpdates[i].dup();
+            clonedMlp.prevBUpdates[i] = this.prevBUpdates[i].dup();
+        }
 
         return clonedMlp;
     }

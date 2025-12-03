@@ -1,18 +1,55 @@
 package math;
 
+import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.Random;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.IntStream;
-
 /**
+ * A pure Java implementation of a 2D matrix with parallelized mathematical operations.
+ * <p>
+ * This class provides a foundational set of matrix functionalities, including creation,
+ * element-wise operations, dot products, and transformations. It is designed to be
+ * a self-contained and efficient alternative to external libraries for basic to intermediate
+ * linear algebra tasks.
+ * </p>
+ * <p>
+ * A key feature of this implementation is the extensive use of Java's Parallel Streams
+ * (`IntStream.range(0, rows).parallel()`) to accelerate computations on multi-core processors.
+ * Operations like dot products, element-wise additions, and function applications are
+ * automatically distributed across available cores, significantly improving performance
+ * for large matrices.
+ * </p>
+ *
+ * <h3>Example Usage</h3>
+ * <p>
+ * The following example demonstrates creating matrices and performing a basic dot product.
+ * </p>
+ * <pre>{@code
+ * // Create a 2x3 matrix with random values
+ * Matrix a = Matrix.Rand(2, 3, 123);
+ *
+ * // Create a 3x2 matrix from a 2D array
+ * Matrix b = new Matrix(new double[][]{
+ *     {1.0, 2.0},
+ *     {3.0, 4.0},
+ *     {5.0, 6.0}
+ * });
+ *
+ * // Perform a dot product (a * b)
+ * Matrix result = a.dot(b); // Result will be a 2x2 matrix
+ *
+ * System.out.println(result);
+ * }</pre>
+ *
  * @author hdaniel@ualg.pt, Brandon Mejia
- * @version 202511052002
+ * @version 2025-12-05
  */
-public class Matrix {
+public class Matrix implements Serializable {
 
+    private static final long serialVersionUID = 1L;
     private double[][] data;
     private int rows, cols;
 

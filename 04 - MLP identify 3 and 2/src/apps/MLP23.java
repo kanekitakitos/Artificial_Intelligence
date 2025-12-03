@@ -1,5 +1,6 @@
 package apps;
 
+import java.io.IOException;
 import math.Matrix;
 import neural.activation.IDifferentiableFunction;
 import neural.activation.Sigmoid;
@@ -35,13 +36,23 @@ import neural.MLP;
  * // 3. Retrieve the best-performing model after training.
  * MLP bestModel = trainer.getMLP();
  *
- * // 4. Use the model to make a prediction on a new data sample.
+ * // 4. (Optional) Save the trained model for later use.
+ * String modelPath = "src/data/models/my_trained_model.ser";
+ * try {
+ *     bestModel.saveModel(modelPath);
+ * } catch (IOException e) {
+ *     e.printStackTrace();
+ * }
+ *
+ * // 5. Use the model to make a prediction on a new data sample.
  * // (Assuming 'newImageMatrix' is a 1x400 Matrix).
  * Matrix prediction = bestModel.predict(newImageMatrix);
  * long label = Math.round(prediction.get(0, 0));
  * System.out.println(label == 0 ? "Predicted: 2" : "Predicted: 3");
  * }</pre>
  *
+ * @see MLP#saveModel(String)
+ * @see MLP#loadModel(String)
  * @see MLP
  * @see DataHandler
  * @see IDifferentiableFunction
@@ -55,7 +66,7 @@ public class MLP23
     private final int epochs = 20000;
     private final double momentum = 0.9;
     private MLP mlp;
-    public static final int SEED = 8; // 2;4;5 5:00 ;7;8 4:21 ;16 4:17
+    public static final int SEED =1; // 2;4;5 5:00 ;7;8 4:21 ;16 4:17
     // seed 8 bigRuido e dataset 99.25%
 
     /**
@@ -106,4 +117,31 @@ public class MLP23
      * @return The trained {@link MLP} instance.
      */
     public MLP getMLP() { return this.mlp; }
+
+
+    /**
+     * Trains the model and saves it to a default file path.
+     * This is a convenience method that calls {@link #trainAndSaveModel(String)}.
+     */
+    public void saveMLP()
+    {
+        // Define o caminho padrão para guardar o modelo.
+        String modelPath = "src/data/models/digit_classifier_v"+99+"_dataset_seed1.ser";
+        trainAndSaveModel(modelPath);
+    }
+
+    /**
+     * Trains the model and then saves the final state to the specified file path.
+     * @param modelPath The path where the trained model will be saved (e.g., "src/data/models/my_model.ser").
+     */
+    public void trainAndSaveModel(String modelPath) {
+        System.out.println("--- Iniciando processo de treino e gravação ---");
+        train(); // Executa o treino completo.
+        try {
+            this.mlp.saveModel(modelPath);
+        } catch (IOException e) {
+            System.err.println("ERRO: Falha ao guardar o modelo em " + modelPath);
+            e.printStackTrace();
+        }
+    }
 }

@@ -1,23 +1,73 @@
 package neural;
 
+import java.io.FileInputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
 import math.Matrix;
 import neural.activation.IDifferentiableFunction;
 import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import neural.activation.Sigmoid;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
+ * A pure Java implementation of a Multi-Layer Perceptron (MLP) with advanced training features.
+ * <p>
+ * This class provides a flexible and robust MLP implementation from scratch, using only the custom
+ * {@link Matrix} class for mathematical operations. It supports configurable network topologies,
+ * activation functions, and includes a sophisticated training method with asynchronous validation
+ * and best-model checkpointing.
+ * </p>
+ *
+ * <h3>Core Features</h3>
+ * <ul>
+ *   <li><b>Dynamic Topology:</b> Create networks with any number of layers and neurons.</li>
+ *   <li><b>Custom Activation Functions:</b> Supports any function that implements {@link IDifferentiableFunction}.</li>
+ *   <li><b>Backpropagation with Momentum:</b> Implements the generalized delta rule for effective learning.</li>
+ *   <li><b>Advanced Training Loop:</b> Features asynchronous validation to prevent training bottlenecks and saves the best-performing model automatically.</li>
+ *   <li><b>Learning Rate Scheduling:</b> Automatically reduces the learning rate if validation error stagnates, helping to fine-tune the model.</li>
+ * </ul>
+ *
+ * <h3>Example Usage</h3>
+ * <p>
+ * To train a model, instantiate the {@code MLP} with a desired configuration and call the train method.
+ * The example below creates a simple network for a binary classification task.
+ * </p>
+ * <pre>{@code
+ * // 1. Define network architecture and activation functions
+ * int[] topology = {400, 10, 1}; // 400 inputs, 10 hidden neurons, 1 output
+ * IDifferentiableFunction[] functions = {new Sigmoid(), new Sigmoid()};
+ *
+ * // 2. Create an MLP instance with a random seed
+ * MLP model = new MLP(topology, functions, 42);
+ *
+ * // 3. Load your training and validation data (e.g., using DataHandler)
+ * // Matrix trainInputs, trainOutputs, valInputs, valOutputs;
+ *
+ * // 4. Train the model
+ * model.train(trainInputs, trainOutputs, valInputs, valOutputs, 0.01, 10000, 0.9);
+ * }</pre>
+ *
+ * @see Matrix
+ * @see IDifferentiableFunction
+ * @see apps.MLP23
  * @author hdaniel@ualg.pt, Brandon Mejia
- * @version 202511052038
+ * @version 2025-12-05
  */
-public class MLP {
+public class MLP implements Serializable {
+
+    private static final double MIN_LEARNING_RATE = 1e-9;
 
     private Matrix[] w;  //weights for each layer
     private Matrix[] b;  //biases for each layer (one per neuron)
     private Matrix[] yp; //outputs for each layer
-    private IDifferentiableFunction[] act; //activation functions for each layer
+    private transient IDifferentiableFunction[] act; //activation functions for each layer
     private int numLayers;
     private Matrix[] prevWUpdates; // For momentum
     private Matrix[] prevBUpdates; // For momentum
@@ -187,14 +237,18 @@ public class MLP {
         ExecutorService validationExecutor = Executors.newSingleThreadExecutor();
         CompletableFuture<Double> validationFuture = null;
 
+        // --- Variáveis para o controlo do treino e da taxa de aprendizado ---
         double bestValidationError = Double.POSITIVE_INFINITY;
+        double currentLr = lr; // Taxa de aprendizado dinâmica
+        int patienceCounter = 0;
+        final int PATIENCE_THRESHOLD = 100; // Número de checagens sem melhoria antes de reduzir o LR
         final AtomicReference<MLP> bestMlp = new AtomicReference<>();
 
         for (int epoch = 1; epoch <= epochs; epoch++)
         {
             // Perform one training step (could be multiple internal epochs, but here it's 1)
             this.predict(trainInputs);
-            this.backPropagation(trainInputs, trainOutputs, lr, momentum);
+            this.backPropagation(trainInputs, trainOutputs, currentLr, momentum);
 
             if (epoch % 10 == 0) {
                 if (validationFuture != null) {
@@ -202,16 +256,34 @@ public class MLP {
                         double currentValidationError = validationFuture.get();
 
                         if ((epoch - 10) > 0 && (epoch - 10) % 100 == 0) {
-                            System.out.printf("Época: %-5d | LR: %.6f | Erro de Validação (MSE): %.6f\n", epoch - 10, lr, currentValidationError);
+                            System.out.printf("Época: %-5d | LR: %.6f | Erro de Validação (MSE): %.6f\n", epoch - 10, currentLr, currentValidationError);
                         }
 
                         if (currentValidationError < bestValidationError) {
                             bestValidationError = currentValidationError;
                             bestMlp.set(this.clone()); // Save a copy of the best model
+                            patienceCounter = 0; // Reset patience
+                        } else if (epoch > 5000) {
+                            // Se o erro não melhorou e já passamos da época 5000, incrementa a paciência.
+                            patienceCounter++;
+                        }
+
+                        // --- Lógica de Redução da Taxa de Aprendizado ---
+                        if (patienceCounter >= PATIENCE_THRESHOLD) {
+                            currentLr *= 0.95; // Reduz o LR em 5%
+                            System.out.printf(">> Validação estagnada. Reduzindo a taxa de aprendizado para %.8f na época %d.\n", currentLr, epoch);
+                            patienceCounter = 0; // Reset patience after reducing LR
                         }
 
                     } catch (Exception e) {
                         e.printStackTrace();
+                    }
+
+                    // --- Condição de Paragem por LR Mínimo ---
+                    if (currentLr < MIN_LEARNING_RATE) {
+                        System.out.printf("\n>> Parando o treino na época %d. A taxa de aprendizado (%.10f) atingiu o limite mínimo.\n", epoch, currentLr);
+                        // Força a saída do loop de épocas definindo a época para o valor máximo.
+                        epoch = epochs + 1;
                     }
                 }
 
@@ -232,6 +304,65 @@ public class MLP {
         }
 
         return bestValidationError;
+    }
+
+    /**
+     * Saves the current state of the MLP model to a file.
+     * <p>
+     * This method serializes the entire MLP object, including its topology,
+     * weights, and biases, allowing it to be loaded later for inference
+     * without retraining.
+     * </p>
+     *
+     * @param filePath The path to the file where the model will be saved (e.g., "src/data/models/mlp_model.ser").
+     * @throws IOException If an I/O error occurs during serialization.
+     */
+    public void saveModel(String filePath) throws IOException {
+        File modelFile = new File(filePath);
+        File parentDir = modelFile.getParentFile();
+
+        // Garante que o diretório pai exista. Se não existir, cria-o.
+        if (parentDir != null && !parentDir.exists()) {
+            parentDir.mkdirs();
+        }
+        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(modelFile))) {
+            oos.writeObject(this);
+            System.out.println("Model saved successfully to " + filePath);
+        }
+    }
+
+    /**
+     * Loads a pre-trained MLP model from a file.
+     *
+     * @param filePath The path to the serialized model file.
+     * @return A new {@link MLP} instance with the loaded state.
+     * @throws IOException            If an I/O error occurs during deserialization.
+     * @throws ClassNotFoundException If the class of the serialized object cannot be found.
+     */
+    public static MLP loadModel(String filePath) throws IOException, ClassNotFoundException
+    {
+        try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(filePath)))
+        {
+            MLP model = (MLP) ois.readObject();
+            //System.out.println("Model loaded successfully from " + filePath);
+            return model;
+        }
+    }
+
+    /**
+     * Custom deserialization method to handle transient fields.
+     * This method is called automatically when the object is read from a stream.
+     * It re-initializes the transient 'act' field.
+     *
+     * @param in The ObjectInputStream to read from.
+     * @throws IOException If an I/O error occurs.
+     * @throws ClassNotFoundException If the class of a serialized object cannot be found.
+     */
+    private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
+        in.defaultReadObject(); // Read all non-transient fields
+        // Re-initialize the transient activation functions array
+        this.act = new IDifferentiableFunction[this.numLayers - 1];
+        for (int i = 0; i < this.act.length; i++) this.act[i] = new Sigmoid();
     }
 
     /**
