@@ -6,9 +6,7 @@ import neural.ModelUtils;
 import neural.activation.IDifferentiableFunction;
 import neural.activation.Sigmoid;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.util.Arrays;
 import java.util.Scanner;
 
@@ -36,30 +34,28 @@ public class P4 {
      * @throws IOException If an I/O error occurs while reading from the console.
      */
     public static void main(String[] args) throws IOException {
-        // 1. Define o caminho para o modelo treinado.
-
-
-
         String modelPath = "src/models/digit_classifier_v99_dataset_seed1.ser";
         //trainMLP23(modelPath);
         MLP mlp = ModelUtils.loadModel(modelPath);
 
-        // Se o modelo não pôde ser carregado, encerra a execução.
         if (mlp == null) {
             System.err.println("ERRO: O modelo MLP não foi carregado. Encerrando o programa.");
             return;
         }
 
         try (Scanner scanner = new Scanner(System.in)) {
-            int n = Integer.parseInt(scanner.nextLine()); // Read the number of test cases
-            for (int i = 0; i < n; i++) {
+            while (scanner.hasNextLine()) {
                 String line = scanner.nextLine();
+                if (line.trim().isEmpty()) {
+                    continue;
+                }
+                
                 double[] inputValues = Arrays.stream(line.split(","))
                         .map(String::trim)
                         .mapToDouble(Double::parseDouble)
                         .toArray();
 
-                Matrix inputMatrix = new Matrix(new double[][] { inputValues });
+                Matrix inputMatrix = new Matrix(new double[][]{inputValues});
                 Matrix predictionMatrix = mlp.predict(inputMatrix);
                 long predictedLabel = Math.round(predictionMatrix.get(0, 0));
                 System.out.println(predictedLabel == 0 ? 2 : 3);
@@ -67,26 +63,22 @@ public class P4 {
         }
     }
 
-    public static void trainMLP23(String modelPath)
-    {
+    public static void trainMLP23(String modelPath) {
         double lr = 0.01;
         int epochs = 20000;
         double momentum = 0.9;
         int SEED = 1;
         IDifferentiableFunction[] functions = {new Sigmoid(), new Sigmoid()};
-        int[] topology = {400,1, 1};
+        int[] topology = {400, 1, 1};
         MLP mlp = new MLP(topology, functions, SEED);
         DataHandler dataManager = new DataHandler(SEED);
-
 
         Matrix trainInputs = dataManager.getTrainInputs();
         Matrix trainOutputs = dataManager.getTrainOutputs();
         Matrix valInputs = dataManager.getTestInputs();
         Matrix valOutputs = dataManager.getTestOutputs();
 
-
-
-        mlp.train(trainInputs, trainOutputs, valInputs, valOutputs, lr,epochs,momentum);
+        mlp.train(trainInputs, trainOutputs, valInputs, valOutputs, lr, epochs, momentum);
         mlp.saveModel(modelPath);
     }
 }
