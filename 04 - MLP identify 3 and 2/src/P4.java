@@ -1,6 +1,10 @@
+import apps.DataHandler;
+import apps.MLP23;
 import math.Matrix;
 import neural.MLP;
 import neural.ModelUtils;
+import neural.activation.IDifferentiableFunction;
+import neural.activation.Sigmoid;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -32,7 +36,11 @@ public class P4 {
      */
     public static void main(String[] args) throws IOException {
         // 1. Define o caminho para o modelo treinado.
+
+
+
         String modelPath = "src/models/digit_classifier_v99_dataset_seed1.ser";
+        //trainMLP23(modelPath);
         MLP mlp = ModelUtils.loadModel(modelPath);
 
         // Se o modelo não pôde ser carregado, encerra a execução.
@@ -56,5 +64,28 @@ public class P4 {
                 System.out.println(predictedLabel == 0 ? 2 : 3);
             }
         }
+    }
+
+    public static void trainMLP23(String modelPath)
+    {
+        double lr = 0.01;
+        int epochs = 20000;
+        double momentum = 0.9;
+        int SEED = 1;
+        IDifferentiableFunction[] functions = {new Sigmoid(), new Sigmoid()};
+        int[] topology = {400,1, 1};
+        MLP mlp = new MLP(topology, functions, SEED);
+        DataHandler dataManager = new DataHandler(SEED);
+
+
+        Matrix trainInputs = dataManager.getTrainInputs();
+        Matrix trainOutputs = dataManager.getTrainOutputs();
+        Matrix valInputs = dataManager.getTestInputs();
+        Matrix valOutputs = dataManager.getTestOutputs();
+
+
+
+        mlp.train(trainInputs, trainOutputs, valInputs, valOutputs, lr,epochs,momentum);
+        mlp.saveModel(modelPath);
     }
 }

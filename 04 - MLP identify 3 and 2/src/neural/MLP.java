@@ -413,4 +413,15 @@ public class MLP implements Serializable {
 
         return clonedMlp;
     }
+
+
+
+
+    public void saveModel(String modelPath) {
+        ModelUtils.saveModel(this, modelPath);
+    }
+
+
+
+
 }

@@ -87,20 +87,7 @@ public class MLP23
         train(dataManager.getTrainInputs(), dataManager.getTrainOutputs(), dataManager.getTestInputs(), dataManager.getTestOutputs());
     }
 
-    /**
-     * A high-level method that orchestrates the entire training process and saves the resulting model.
-     * <p>
-     * This method serves as a convenient entry point for a complete train-and-save workflow. It first
-     * calls the internal {@link #train()} method to run the full training and validation cycle.
-     * Once training is complete, it uses the {@link ModelUtils} class to serialize the best-performing
-     * model to the specified file path.
-     * </p>
-     * @param modelPath The file path where the trained model should be saved (e.g., "src/models/mlp_model.ser").
-     */
-    public void trainAndSaveModel(String modelPath) {
-        train(); // Execute the full training process.
-        ModelUtils.saveModel(this.mlp, modelPath);
-    }
+
     /**
      * Trains the MLP model using the provided training and validation datasets.
      *
