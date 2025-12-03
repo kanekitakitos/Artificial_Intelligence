@@ -61,12 +61,12 @@ public class DataHandler {
 
     // --- Default File Paths ---
     private static final String[] DEFAULT_INPUT_PATHS = {
-            "src/data/datasetMoonshak.csv",
-            //"src/data/dataset.csv",
+            //"src/data/datasetMoonshak.csv",
+            "src/data/dataset.csv",
             //"src/data/bigRuido.csv",
     }; // bigRuido e dataset the best 99.13
     private static final String[] DEFAULT_OUTPUT_PATHS = {
-            "src/data/labelsMoonshak.csv" // Reused for all input files
+            "src/data/labels.csv" // Reused for all input files
     };
     private static final String DEFAULT_TEST_INPUT_PATH = "src/data/datasetTest.csv";
     private static final String DEFAULT_TEST_LABELS_PATH = "src/data/labelsTest.csv";
