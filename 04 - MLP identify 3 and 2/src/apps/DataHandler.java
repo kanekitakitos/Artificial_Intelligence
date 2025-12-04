@@ -62,15 +62,15 @@ public class DataHandler {
     // --- Default File Paths ---
     private static final String[] DEFAULT_INPUT_PATHS = {
             //"src/data/borroso.csv",
-            "src/data/dataset.csv",
-            "src/data/bigRuido.csv",
+            "src/data/train/dataset.csv",
+            "src/data/train/bigRuido.csv",
             //"src/data/small.csv",
     }; // bigRuido e dataset the best 99.13
     private static final String[] DEFAULT_OUTPUT_PATHS = {
-            "src/data/labels.csv" // Reused for all input files
+            "src/data/train/labels.csv" // Reused for all input files
     };
-    private static final String DEFAULT_TEST_INPUT_PATH = "src/data/datasetTest.csv";
-    private static final String DEFAULT_TEST_LABELS_PATH = "src/data/labelsTest.csv";
+    private static final String DEFAULT_TEST_INPUT_PATH = "src/data/testData/test.csv";
+    private static final String DEFAULT_TEST_LABELS_PATH = "src/data/testData/testL.csv";
 
     private static class DataPoint {
         final double[] input;

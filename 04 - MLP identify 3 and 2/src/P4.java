@@ -39,8 +39,8 @@ public class P4
     public static void main(String[] args)
     {
         // 1. Create and train the model once.
-        String path = "src/models/mlp23vSeed1Dataset1Neuron.model";
-        //trainMLP23(path);
+        String path = "src/models/Seed8DatasetBigRuido99_13.model";
+        trainMLP23(path);
         MLP mlp = ModelUtils.loadModel(path);
 
         // 2. Read all 'm' samples from standard input.
@@ -84,24 +84,9 @@ public class P4
 
     public static void trainMLP23(String modelPath)
     {
-        double lr = 0.01;
-        int epochs = 20000;
-        double momentum = 0.9;
-        int SEED = 1;
-        IDifferentiableFunction[] functions = {new Sigmoid(), new Sigmoid()};
-        int[] topology = {400,1, 1};
-        MLP mlp = new MLP(topology, functions, SEED);
-        DataHandler dataManager = new DataHandler(SEED);
-
-
-        Matrix trainInputs = dataManager.getTrainInputs();
-        Matrix trainOutputs = dataManager.getTrainOutputs();
-        Matrix valInputs = dataManager.getTestInputs();
-        Matrix valOutputs = dataManager.getTestOutputs();
-
-
-
-        mlp.train(trainInputs, trainOutputs, valInputs, valOutputs, lr,epochs,momentum);
+        MLP23 mlp23 = new MLP23();
+        mlp23.train();
+        MLP mlp = mlp23.getMLP();
         mlp.saveModel(modelPath);
     }
 }
