@@ -143,14 +143,14 @@ public class MLP implements Serializable {
             // delta = e .* dy
             delta = e.mult(dy);
 
-            // Calcula a atualização com momentum
+            // Calculate the update with momentum
             Matrix wUpdate = yp[l].transpose().dot(delta).mult(lr).add(prevWUpdates[l].mult(momentum));
             Matrix bUpdate = delta.sumColumns().mult(lr).add(prevBUpdates[l].mult(momentum));
 
             w[l] = w[l].add(wUpdate);
             b[l] = b[l].add(bUpdate);
 
-            // Salva as atualizações atuais para a próxima iteração
+            // Save the current updates for the next iteration
             prevWUpdates[l] = wUpdate;
             prevBUpdates[l] = bUpdate;
         }
@@ -226,15 +226,15 @@ public class MLP implements Serializable {
      */
     public double train(Matrix trainInputs, Matrix trainOutputs, Matrix valInputs, Matrix valOutputs, double lr, int epochs, double momentum)
     {
-        System.out.println("Iniciando o treinamento da rede...");
-        System.out.println("Amostras de Treino: " + trainInputs.rows() + " | Amostras de Validação: " + valInputs.rows());
+        System.out.println("Starting network training...");
+        System.out.println("Training Samples: " + trainInputs.rows() + " | Validation Samples: " + valInputs.rows());
 
         ExecutorService validationExecutor = Executors.newSingleThreadExecutor();
         CompletableFuture<Double> validationFuture = null;
 
-        // --- Variáveis para o controlo do treino e da taxa de aprendizado ---
+        // --- Variables for training control and learning rate scheduling ---
         double bestValidationError = Double.POSITIVE_INFINITY;
-        double currentLr = lr; // Taxa de aprendizado dinâmica
+        double currentLr = lr; // Dynamic learning rate
         int patienceCounter = 0;
         final int PATIENCE_THRESHOLD = 100; // Número de checagens sem melhoria antes de reduzir o LR
         final AtomicReference<MLP> bestMlp = new AtomicReference<>();
@@ -251,7 +251,7 @@ public class MLP implements Serializable {
                         double currentValidationError = validationFuture.get();
 
                         if ((epoch - 10) > 0 && (epoch - 10) % 100 == 0) {
-                            System.out.printf("Época: %-5d | LR: %.6f | Erro de Validação (MSE): %.6f\n", epoch - 10, currentLr, currentValidationError);
+                            System.out.printf("Epoch: %-5d | LR: %.6f | Validation Error (MSE): %.6f\n", epoch - 10, currentLr, currentValidationError);
                         }
 
                         if (currentValidationError < bestValidationError) {
@@ -259,14 +259,14 @@ public class MLP implements Serializable {
                             bestMlp.set(this.clone()); // Save a copy of the best model
                             patienceCounter = 0; // Reset patience
                         } else if (epoch > 5000) {
-                            // Se o erro não melhorou e já passamos da época 5000, incrementa a paciência.
+                            // If the error has not improved and we are past epoch 5000, increment patience.
                             patienceCounter++;
                         }
 
-                        // --- Lógica de Redução da Taxa de Aprendizado ---
+                        // --- Learning Rate Reduction Logic ---
                         if (patienceCounter >= PATIENCE_THRESHOLD) {
-                            currentLr *= 0.95; // Reduz o LR em 5%
-                            System.out.printf(">> Validação estagnada. Reduzindo a taxa de aprendizado para %.8f na época %d.\n", currentLr, epoch);
+                            currentLr *= 0.95; // Reduce LR by 5%
+                            System.out.printf(">> Validation stagnated. Reducing learning rate to %.8f at epoch %d.\n", currentLr, epoch);
                             patienceCounter = 0; // Reset patience after reducing LR
                         }
 
@@ -274,10 +274,10 @@ public class MLP implements Serializable {
                         e.printStackTrace();
                     }
 
-                    // --- Condição de Paragem por LR Mínimo ---
+                    // --- Minimum LR Stop Condition ---
                     if (currentLr < MIN_LEARNING_RATE) {
-                        System.out.printf("\n>> Parando o treino na época %d. A taxa de aprendizado (%.10f) atingiu o limite mínimo.\n", epoch, currentLr);
-                        // Força a saída do loop de épocas definindo a época para o valor máximo.
+                        System.out.printf("\n>> Stopping training at epoch %d. Learning rate (%.10f) reached the minimum threshold.\n", epoch, currentLr);
+                        // Force exit from the epoch loop by setting the epoch to its maximum value.
                         epoch = epochs + 1;
                     }
                 }
@@ -291,7 +291,7 @@ public class MLP implements Serializable {
         }
 
         validationExecutor.shutdown();
-        System.out.println("Treinamento concluído.");
+        System.out.println("Training complete.");
 
         if (bestMlp.get() != null) {
             this.setWeights(bestMlp.get().getWeights());

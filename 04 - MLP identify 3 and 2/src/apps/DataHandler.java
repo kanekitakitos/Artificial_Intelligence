@@ -62,8 +62,8 @@ public class DataHandler {
     // --- Default File Paths ---
     private static final String[] DEFAULT_INPUT_PATHS = {
             //"src/data/datasetMoonshak.csv",
-            "src/data/dataset.csv",
-            //"src/data/bigRuido.csv",
+            "src/data/dataset.csv"
+            //"src/data/bigRuido.csv"
     }; // bigRuido e dataset the best 99.13
     private static final String[] DEFAULT_OUTPUT_PATHS = {
             "src/data/labels.csv" // Reused for all input files
@@ -185,11 +185,11 @@ public class DataHandler {
      */
     private List<DataPoint> loadAndProcess(String[] inputPaths, String[] outputPaths)
     {
-        // Processa cada par de ficheiros em paralelo e recolhe as listas de DataPoints.
+        // Process each file pair in parallel and collect the lists of DataPoints.
         return IntStream.range(0, inputPaths.length).parallel()
                 .mapToObj(i -> {
                     String inputPath = inputPaths[i];
-                    // Usa o último ficheiro de labels se não houver um correspondente.
+                    // Use the last labels file if a corresponding one is not available.
                     String outputPath = (i < outputPaths.length) ? outputPaths[i] : outputPaths[outputPaths.length - 1];
 
                     List<double[]> inputs = loadCsv(inputPath);
@@ -199,7 +199,7 @@ public class DataHandler {
                         throw new IllegalStateException("Input file " + inputPath + " and output file " + outputPath + " have a different number of rows.");
                     }
 
-                    // Processa as linhas de cada ficheiro e cria os DataPoints.
+                    // Process the rows of each file and create DataPoints.
                     return IntStream.range(0, inputs.size())
                             .mapToObj(j -> {
                                 double[] input = inputs.get(j);
@@ -212,11 +212,11 @@ public class DataHandler {
                                         input[k] /= 255.0;
 
                                 double[] output = outputs.get(j);
-                                output[0] = (output[0] == 3.0) ? 1.0 : 0.0; // Converte 3.0 para 1.0, e o resto para 0.0
+                                output[0] = (output[0] == 3.0) ? 1.0 : 0.0; // Convert 3.0 to 1.0, and the rest to 0.0
                                 return new DataPoint(input, output);
                             }).collect(Collectors.toList());
                 })
-                .flatMap(Collection::stream) // Agrega todas as listas de DataPoints numa só.
+                .flatMap(Collection::stream) // Aggregate all lists of DataPoints into one.
                 .collect(Collectors.toList());
     }
 
@@ -256,24 +256,24 @@ public class DataHandler {
     }
 
     /**
-     * Carrega um conjunto de dados de teste a partir dos caminhos de ficheiro fornecidos.
-     * Este método não embaralha os dados, preservando a sua ordem original para avaliação.
+     * Loads a test dataset from the provided file paths.
+     * This method does not shuffle the data, preserving its original order for evaluation.
      *
-     * @param inputPath  O caminho para o ficheiro de inputs (features) do teste.
-     * @param labelsPath O caminho para o ficheiro de outputs (labels) do teste.
-     * @return Um array de {@link Matrix} contendo as matrizes de input e output. O índice 0 contém os inputs e o índice 1 os outputs.
+     * @param inputPath  The path to the test inputs (features) file.
+     * @param labelsPath The path to the test outputs (labels) file.
+     * @return An array of {@link Matrix} where index 0 contains the inputs and index 1 contains the outputs.
      */
     public static Matrix[] loadTestData(String inputPath, String labelsPath)
     {
-        // 1. Carrega os dados brutos dos ficheiros CSV.
+        // 1. Load raw data from CSV files.
         List<double[]> inputs = loadCsv(inputPath);
         List<double[]> outputs = loadCsv(labelsPath);
 
         if (inputs.size() != outputs.size())
-            throw new IllegalStateException("Ficheiro de input " + inputPath);
+            throw new IllegalStateException("Input file " + inputPath + " and labels file " + labelsPath + " have mismatched row counts.");
 
 
-        // 2. Pré-processa os dados e cria os DataPoints.
+        // 2. Preprocess the data and create DataPoints.
         List<DataPoint> testData = IntStream.range(0, inputs.size()).parallel()
                 .mapToObj(i -> {
                     double[] input = inputs.get(i);
@@ -286,20 +286,20 @@ public class DataHandler {
                     }
 
                     double[] output = outputs.get(i);
-                    output[0] = (output[0] == 3.0) ? 1.0 : 0.0; // Converte labels
+                    output[0] = (output[0] == 3.0) ? 1.0 : 0.0; // Convert labels
                     return new DataPoint(input, output);
                 }).collect(Collectors.toList());
 
-        // 3. Converte para matrizes e retorna.
+        // 3. Convert to matrices and return.
         Matrix testInputs = new Matrix(listTo2DArray(testData, true));
         Matrix testOutputs = new Matrix(listTo2DArray(testData, false));
         return new Matrix[]{testInputs, testOutputs};
     }
 
     /**
-     * Carrega o conjunto de dados de teste predefinido.
+     * Loads the default test dataset.
      *
-     * @return Um array de {@link Matrix} onde o índice 0 é a matriz de inputs e o índice 1 é a de outputs.
+     * @return An array of {@link Matrix} where index 0 is the input matrix and index 1 is the output matrix.
      */
     public static Matrix[] loadDefaultTestData() {
         return loadTestData(DEFAULT_TEST_INPUT_PATH, DEFAULT_TEST_LABELS_PATH);

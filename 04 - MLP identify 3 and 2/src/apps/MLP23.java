@@ -57,7 +57,7 @@ public class MLP23
     private final int epochs = 20000;
     private final double momentum = 0.9;
     private MLP mlp;
-    public static final int SEED =1; // 2;4;5 5:00 ;7;8 4:21 ;16 4:17
+    public static final int SEED = 1; // 2;4;5 5:00 ;7;8 4:21 ;16 4:17
     // seed 8 bigRuido e dataset 99.25%
 
     /**
@@ -66,7 +66,7 @@ public class MLP23
     public MLP23()
     {
         IDifferentiableFunction[] functions = {new Sigmoid(), new Sigmoid()};
-        int[] topology = {400,1, 1};
+        int[] topology = {400, 1, 1};
 
         this.mlp = new MLP(topology, functions, SEED);
     }

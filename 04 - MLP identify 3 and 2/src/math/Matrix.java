@@ -62,10 +62,14 @@ public class Matrix implements Serializable {
 
     public Matrix(double[][] data) {
         this.rows = data.length;
-        this.cols = data[0].length;
+        // Ensure cols is defined even if there are no rows, and find the maximum number of columns.
+        this.cols = (rows > 0) ? Arrays.stream(data).mapToInt(row -> row.length).max().orElse(0) : 0;
         this.data = new double[rows][cols];
-        for (int i = 0; i < rows; i++)
-            System.arraycopy(data[i], 0, this.data[i], 0, cols);
+        // Copy each row, respecting its individual length.
+        // Shorter rows will be padded with zeros at the end.
+        for (int i = 0; i < rows; i++) {
+            System.arraycopy(data[i], 0, this.data[i], 0, data[i].length);
+        }
 
     }
 
@@ -174,7 +178,7 @@ public class Matrix implements Serializable {
 
     //sum all elements of the matrix
     public double sum() {
-        // Paraleliza a soma de todos os elementos da matriz
+        // Parallelizes the sum of all matrix elements.
         return Arrays.stream(data).parallel().flatMapToDouble(Arrays::stream).sum();
     }
 
