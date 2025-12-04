@@ -115,23 +115,26 @@ public class HyperparameterTuner {
     private final int epochs = 30000;
 
     // --- Hiperparámetros para a busca ---
-    private final double[] learningRates = {0.01,
-                                        0.005, 0.001,0.002,0.02,0.003
-                                        ,0.0005,0.0001,0.0002,0.00005,0.00001
+    private final double[] learningRates = {0.01,0.02,0.03 , 0.015, 0.011
+                                        //0.005, 0.001,0.002,0.02,0.003
+                                        //,0.0005,0.0001,0.0002,0.00005
     };
 
-    private final double[] momentums = {0.7, 0.8, 0.9 , 0.95, 0.6 , 0.0
+    private final double[] momentums = {//0.7, 0.8, 0.6 ,
+                                            0.7,0.9
     };
 
     private final int[][] topologies = {
-            {400, 1, 1},
+            //{400, 4, 1},
+            {400, 3, 1},
             //{400, 2, 1},
-            //{400, 4, 1}
+            //{400, 3, 1},
+            //{400, 2, 1}
 
     };
     private final IDifferentiableFunction[][] activationFunctions = {
-            {new Sigmoid(), new Sigmoid()},
-            //{new TanH(), new TanH()},
+            //{new Sigmoid(), new Sigmoid()},
+            {new TanH(), new Sigmoid()},
             //{new ReLU(), new Sigmoid()} // ReLU para camadas ocultas, Sigmoid para a saída
     };
 
@@ -244,7 +247,7 @@ public class HyperparameterTuner {
                     TuningResult result = future.get();
                     results.add(result);
                     // Guarda o resultado imediatamente, mas apenas se a acurácia for superior a 90%.
-                    if (result.accuracy > 90.0) {
+                    if (result.accuracy > 97.0) {
                         saveResult(result);
                         System.out.printf(">> Completed trial %d/%d. Accuracy > 90%%. Result saved.\n", (i + 1), tasks.size());
                     } else {

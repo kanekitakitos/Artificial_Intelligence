@@ -39,8 +39,8 @@ public class P4
     public static void main(String[] args)
     {
         // 1. Create and train the model once.
-        String path = "src/models/Seed8DatasetBigRuido99_13.model";
-//        trainMLP23(path);
+        String path = "src/models/Seed8_8_BigRuido99.model";
+        trainMLP23(path);
 
 
         MLP mlp = ModelUtils.loadModel(path);

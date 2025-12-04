@@ -198,40 +198,66 @@ public class MLP implements Serializable {
      */
     public double train(Matrix trainInputs, Matrix trainOutputs, Matrix valInputs, Matrix valOutputs, double lr, int epochs, double momentum)
     {
-        System.out.println("Iniciando o treinamento da rede...");
-        System.out.println("Amostras de Treino: " + trainInputs.rows() + " | Amostras de Validação: " + valInputs.rows());
+        // --- CONFIGURAÇÕES ---
+        int batchSize = 64;
+        final int PATIENCE_EPOCHS = 5000;
+        final int VALIDATION_FREQUENCY = 10;
 
+        // --- INICIALIZAÇÃO ---
         ExecutorService validationExecutor = Executors.newSingleThreadExecutor();
         CompletableFuture<Double> validationFuture = null;
 
         double bestValidationError = Double.POSITIVE_INFINITY;
         final AtomicReference<MLP> bestMlp = new AtomicReference<>();
+        int epochsSinceLastImprovement = 0;
+        int totalSamples = trainInputs.rows();
 
-        for (int epoch = 1; epoch <= epochs; epoch++)
-        {
-            // Perform one training step (could be multiple internal epochs, but here it's 1)
-            this.predict(trainInputs);
-            this.backPropagation(trainInputs, trainOutputs, lr, momentum);
+        for (int epoch = 1; epoch <= epochs; epoch++) {
+            // --- LOOP DE MINI-BATCHES ---
+            for (int i = 0; i < totalSamples; i += batchSize) {
+                int end = Math.min(i + batchSize, totalSamples);
 
-            if (epoch % 10 == 0) {
+                // Fatiar os dados (Slicing) para o lote atual
+                Matrix batchX = trainInputs.getRows(i, end);
+                Matrix batchY = trainOutputs.getRows(i, end);
+
+                // Treinar apenas neste lote
+                this.predict(batchX);
+                this.backPropagation(batchX, batchY, lr, momentum);
+            }
+
+            // --- VALIDAÇÃO ASSÍNCRONA ---
+            if (epoch % VALIDATION_FREQUENCY == 0) {
                 if (validationFuture != null) {
                     try {
                         double currentValidationError = validationFuture.get();
 
-                        if ((epoch - 10) > 0 && (epoch - 10) % 100 == 0) {
-                            System.out.printf("Época: %-5d | LR: %.6f | Erro de Validação (MSE): %.6f\n", epoch - 10, lr, currentValidationError);
-                        }
+                    // Imprime o progresso em intervalos regulares para feedback visual
+                    if ((epoch - VALIDATION_FREQUENCY) > 0 && (epoch - VALIDATION_FREQUENCY) % 100 == 0) {
+                        System.out.printf("Época: %-5d | LR: %.8f | (MSE): %.6f\n", epoch - VALIDATION_FREQUENCY, lr, currentValidationError);
+                    }
 
+                        // Verifica se o modelo melhorou
                         if (currentValidationError < bestValidationError) {
                             bestValidationError = currentValidationError;
-                            bestMlp.set(this.clone()); // Save a copy of the best model
+                            bestMlp.set(this.clone()); // Guarda o campeão
+                            epochsSinceLastImprovement = 0; // Reseta o contador
+                        } else {
+                            epochsSinceLastImprovement += VALIDATION_FREQUENCY; // Incrementa pelo intervalo
+                        }
+
+                        // Checagem de Parada Antecipada
+                        if (epochsSinceLastImprovement >= PATIENCE_EPOCHS) {
+                            System.out.printf("\nParada antecipada na época %d. Sem melhoria há %d épocas. Melhor erro: %.6f\n", epoch, epochsSinceLastImprovement, bestValidationError);
+                            validationFuture.cancel(true); // Cancela a próxima validação
+                            break; // Sai do loop de treinamento
                         }
 
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
                 }
-
+                // Lança a próxima validação em background
                 final MLP modelCloneForValidation = this.clone();
                 validationFuture = CompletableFuture.supplyAsync(() -> {
                     Matrix valPrediction = modelCloneForValidation.predict(valInputs);
@@ -241,7 +267,6 @@ public class MLP implements Serializable {
         }
 
         validationExecutor.shutdown();
-        System.out.println("Treinamento concluído.");
 
         if (bestMlp.get() != null) {
             this.setWeights(bestMlp.get().getWeights());

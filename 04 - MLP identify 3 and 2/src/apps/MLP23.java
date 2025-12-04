@@ -4,6 +4,7 @@ import math.Matrix;
 import neural.activation.IDifferentiableFunction;
 import neural.activation.Sigmoid;
 import neural.MLP;
+import neural.activation.TanH;
 
 /**
  * A factory and trainer for a specific Multi-Layer Perceptron (MLP) model designed to classify handwritten digits '2' and '3'.
@@ -51,9 +52,9 @@ import neural.MLP;
 public class MLP23
 {
 
-    private final double lr = 0.0005;
+    private final double lr = 0.01;
     private final int epochs = 30000;
-    private final double momentum = 0.99;
+    private final double momentum = 0.7;
     private MLP mlp;
     public static final int SEED = 8; // 2;4;5 5:00 ;7;8 4:21 ;16 4:17
     // seed 8 bigRuido e dataset 98 ---> 84.625
@@ -63,8 +64,8 @@ public class MLP23
      */
     public MLP23()
     {
-        IDifferentiableFunction[] functions = {new Sigmoid(), new Sigmoid()};
-        int[] topology = {400, 1, 1};
+        IDifferentiableFunction[] functions = {new TanH(), new Sigmoid()};
+        int[] topology = {400, 4, 1};
 
         this.mlp = new MLP(topology, functions, SEED);
     }

@@ -121,41 +121,99 @@ public class GpuMLP {
         System.out.println("Treinamento concluído.");
     }
 
+    /**
+     * Treina a rede usando treinamento em mini-lotes, validação assíncrona e parada antecipada.
+     * <p>
+     * Este método orquestra um ciclo de treinamento avançado que processa os dados em lotes
+     * (mini-batches) para otimizar o uso de memória e acelerar a convergência. Em paralelo, ele
+     * avalia o desempenho do modelo em um conjunto de validação de forma assíncrona.
+     * </p>
+     *
+     * <h3>Fluxo de Treinamento</h3>
+     * <ol>
+     *   <li><b>Loop de Épocas:</b> Itera pelo número máximo de épocas definido.</li>
+     *   <li><b>Loop de Mini-Lotes:</b> Dentro de cada época, os dados de treinamento são divididos
+     *       em lotes de tamanho fixo. O modelo é treinado em cada lote sequencialmente.</li>
+     *   <li><b>Validação Assíncrona:</b> Em intervalos regulares (definidos por `VALIDATION_FREQUENCY`),
+     *       o método dispara uma tarefa em segundo plano para calcular o erro (MSE) no conjunto de validação.
+     *       Isso evita que a validação bloqueie o treinamento.</li>
+     *   <li><b>Checkpoint do Melhor Modelo:</b> Se o erro de validação atual for o menor já registrado,
+     *       uma cópia do modelo (seus pesos e vieses) é salva.</li>
+     *   <li><b>Parada Antecipada (Early Stopping):</b> O treinamento é interrompido se o erro de validação
+     *       não melhorar por um número específico de épocas (`PATIENCE_EPOCHS`), evitando o superajuste
+     *       (overfitting) e economizando tempo computacional.</li>
+     * </ol>
+     *
+     * <p>
+     * Ao final, o modelo com o melhor desempenho de validação é restaurado, garantindo que a instância
+     * final da classe represente o estado mais otimizado encontrado durante o processo.
+     * </p>
+     *
+     * @param trainInputs  Os dados de entrada para treinamento.
+     * @param trainOutputs Os rótulos de destino para treinamento.
+     * @param valInputs    Os dados de entrada para validação.
+     * @param valOutputs   Os rótulos de destino para validação.
+     * @param lr           A taxa de aprendizado (learning rate).
+     * @param epochs       O número máximo de épocas de treinamento.
+     * @param momentum     O fator de momentum para atualizações de peso.
+     * @return O melhor erro de validação (MSE) alcançado durante o treinamento.
+     */
     public double train(INDArray trainInputs, INDArray trainOutputs, INDArray valInputs, INDArray valOutputs, double lr, int epochs, double momentum) {
-        //System.out.println("Iniciando o treinamento da rede (GPU)...");
-        //System.out.println("Amostras de Treino: " + trainInputs.rows() + " | Amostras de Validação: " + valInputs.rows());
+        // --- CONFIGURAÇÕES ---
+        int batchSize = 64;
+        final int PATIENCE_EPOCHS = 5000;
+        final int VALIDATION_FREQUENCY = 10;
 
+        // --- INICIALIZAÇÃO ---
         ExecutorService validationExecutor = Executors.newSingleThreadExecutor();
         CompletableFuture<Double> validationFuture = null;
 
         double bestValidationError = Double.POSITIVE_INFINITY;
         final AtomicReference<GpuMLP> bestMlp = new AtomicReference<>();
+        int epochsSinceLastImprovement = 0;
+        int totalSamples = (int) trainInputs.rows();
 
         for (int epoch = 1; epoch <= epochs; epoch++) {
-            // Perform one training step
-            this.predict(trainInputs);
-            this.backPropagation(trainInputs, trainOutputs, lr, momentum);
+            // --- LOOP DE MINI-BATCHES ---
+            for (int i = 0; i < totalSamples; i += batchSize) {
+                int end = Math.min(i + batchSize, totalSamples);
 
-            // Asynchronous validation
-            if (epoch % 10 == 0) {
+                // Fatiar os dados (Slicing) de forma eficiente com ND4J
+                INDArray batchX = trainInputs.get(org.nd4j.linalg.indexing.NDArrayIndex.interval(i, end), org.nd4j.linalg.indexing.NDArrayIndex.all());
+                INDArray batchY = trainOutputs.get(org.nd4j.linalg.indexing.NDArrayIndex.interval(i, end), org.nd4j.linalg.indexing.NDArrayIndex.all());
+
+                // Treinar apenas neste lote
+                this.predict(batchX);
+                this.backPropagation(batchX, batchY, lr, momentum);
+            }
+
+            // --- VALIDAÇÃO ASSÍNCRONA ---
+            if (epoch % VALIDATION_FREQUENCY == 0) {
                 if (validationFuture != null) {
                     try {
                         double currentValidationError = validationFuture.get();
 
-                        if ((epoch - 10) > 0 && (epoch - 10) % 100 == 0) {
-                            //System.out.printf("Época: %-5d | LR: %.6f | Erro de Validação (MSE): %.6f\n", epoch - 10, lr, currentValidationError);
-                        }
-
+                        // Verifica se o modelo melhorou
                         if (currentValidationError < bestValidationError) {
                             bestValidationError = currentValidationError;
-                            bestMlp.set(this.clone()); // Save a copy of the best model
+                            bestMlp.set(this.clone()); // Guarda o campeão
+                            epochsSinceLastImprovement = 0; // Reseta o contador
+                        } else {
+                            epochsSinceLastImprovement += VALIDATION_FREQUENCY; // Incrementa pelo intervalo
+                        }
+
+                        // Checagem de Parada Antecipada
+                        if (epochsSinceLastImprovement >= PATIENCE_EPOCHS) {
+                            System.out.printf("\nParada antecipada na época %d. Sem melhoria há %d épocas. Melhor erro: %.6f\n", epoch, epochsSinceLastImprovement, bestValidationError);
+                            validationFuture.cancel(true); // Cancela a próxima validação
+                            break; // Sai do loop de treinamento
                         }
 
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
                 }
-
+                // Lança a próxima validação em background
                 final GpuMLP modelCloneForValidation = this.clone();
                 validationFuture = CompletableFuture.supplyAsync(() -> {
                     INDArray valPrediction = modelCloneForValidation.predict(valInputs);
@@ -166,9 +224,9 @@ public class GpuMLP {
         }
 
         validationExecutor.shutdown();
-        System.out.println("Treinamento concluído.");
 
-        // Restore the best model found
+        // --- RESTAURAÇÃO DO MELHOR MODELO ---
+        // Se o treino parou ou terminou, garante que o modelo final seja o melhor encontrado.
         if (bestMlp.get() != null) {
             this.setWeights(bestMlp.get().getWeights());
             this.setBiases(bestMlp.get().getBiases());
@@ -210,7 +268,9 @@ public class GpuMLP {
     private INDArray applyActivation(INDArray input, IDifferentiableFunction activation) {
         if (activation instanceof Sigmoid) {
             return Transforms.sigmoid(input, true);
-        }
+        } else if (activation instanceof TanH) {
+            return Transforms.tanh(input, true);
+        } 
         throw new IllegalArgumentException("Unsupported activation function for GPU: " + activation.getClass().getSimpleName());
     }
 
@@ -240,7 +300,11 @@ public class GpuMLP {
             // The derivative of sigmoid is calculated based on its output y: y * (1 - y)
             // Here 'input' is already the output of the sigmoid layer (y = yp[l+1])
             return input.mul(input.rsub(1.0)); // y * (1 - y)
-        }
+        } else if (activation instanceof TanH) {
+            // The derivative of tanh is 1 - y^2, where y is the output of the tanh layer.
+            // Here 'input' is already the output of the tanh layer (y = yp[l+1])
+            return input.mul(input).rsub(1.0); // 1 - y^2
+        } 
         throw new IllegalArgumentException("Unsupported activation function for GPU: " + activation.getClass().getSimpleName());
     }
 

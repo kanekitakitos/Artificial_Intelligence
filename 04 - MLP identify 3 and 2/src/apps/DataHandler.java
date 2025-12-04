@@ -65,10 +65,10 @@ public class DataHandler {
     // --- Default File Paths ---
     private static final String[] DEFAULT_INPUT_PATHS = {
             //"src/data/borroso.csv",
+            "src/data/train/bigRuido.csv",
             "src/data/train/8.csv",
-            "src/data/train/borroso.csv",
             //"src/data/small.csv",
-    }; // bigRuido e dataset the best 99.13
+    }; // bigRuido e dataset
     private static final String[] DEFAULT_OUTPUT_PATHS = {
             "src/data/train/labels.csv" // Reused for all input files
     };

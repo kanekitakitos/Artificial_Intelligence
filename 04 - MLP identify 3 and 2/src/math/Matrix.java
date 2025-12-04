@@ -203,6 +203,23 @@ public class Matrix implements Serializable {
         return result;
     }
 
+    /**
+     * Extracts a range of rows from the matrix to create a new sub-matrix.
+     * This is equivalent to slicing the matrix along its rows.
+     *
+     * @param start The starting row index (inclusive).
+     * @param end   The ending row index (exclusive).
+     * @return A new {@link Matrix} containing the specified rows.
+     */
+    public Matrix getRows(int start, int end) {
+        if (start < 0 || end > this.rows || start > end) {
+            throw new IllegalArgumentException("Invalid row range for getRows.");
+        }
+        int numRows = end - start;
+        double[][] subData = new double[numRows][this.cols];
+        System.arraycopy(this.data, start, subData, 0, numRows);
+        return new Matrix(subData);
+    }
 
     //==============================================================
     //  Convert operations
