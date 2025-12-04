@@ -120,7 +120,7 @@ public class HyperparameterTuner {
                                         ,0.0005,0.0001,0.0002,0.00005,0.00001
     };
 
-    private final double[] momentums = {0.7, 0.8, 0.9 , 0.95, 0.99 , 1
+    private final double[] momentums = {0.7, 0.8, 0.9 , 0.95, 0.99 , 0.6
     };
 
     private final int[][] topologies = {
@@ -148,7 +148,8 @@ public class HyperparameterTuner {
 
             @Override
             public String toString() {
-                return String.format("Parameters: [%s] -> Accuracy: %.2f%%", paramsDescription, accuracy);
+                int seed = MLP23.SEED;
+                return String.format(seed+" Parameters: [%s] -> Accuracy: %.2f%%", paramsDescription, accuracy);
             }
         }
 

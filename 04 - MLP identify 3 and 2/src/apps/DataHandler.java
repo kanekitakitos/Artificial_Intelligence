@@ -61,9 +61,10 @@ public class DataHandler {
 
     // --- Default File Paths ---
     private static final String[] DEFAULT_INPUT_PATHS = {
-            //"src/data/datasetMoonshak.csv",
+            //"src/data/borroso.csv",
             "src/data/dataset.csv",
-            //"src/data/bigRuido.csv",
+            "src/data/bigRuido.csv",
+            //"src/data/datasetRuido_apenas_novos.csv",
     }; // bigRuido e dataset the best 99.13
     private static final String[] DEFAULT_OUTPUT_PATHS = {
             "src/data/labels.csv" // Reused for all input files
