@@ -64,7 +64,7 @@ public class DataHandler {
             //"src/data/borroso.csv",
             "src/data/dataset.csv",
             "src/data/bigRuido.csv",
-            //"src/data/datasetRuido_apenas_novos.csv",
+            //"src/data/small.csv",
     }; // bigRuido e dataset the best 99.13
     private static final String[] DEFAULT_OUTPUT_PATHS = {
             "src/data/labels.csv" // Reused for all input files
