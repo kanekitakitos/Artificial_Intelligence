@@ -4,6 +4,7 @@ import apps.DataHandler;
 import math.Matrix;
 import apps.MLP23;
 import neural.MLP;
+import neural.ModelUtils;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,7 +22,7 @@ class TestMLP23
     private static Matrix testX;
     private static Matrix testY;
     private static int seed = 8;
-    private static DataHandler dh = new DataHandler(seed);
+    private static DataHandler dh = new DataHandler(seed, DataHandler.NormalizationType.MIN_MAX);
 
     @BeforeAll
     static void setUp()
@@ -31,10 +32,13 @@ class TestMLP23
         testX = dh.getTestInputs();
         testY = dh.getTestOutputs();
         // Get a pre-trained clone of the MLP model
-        MLP23 modelFactory = new MLP23();
+//        MLP23 modelFactory = new MLP23();
+//        modelFactory.train();
+//        mlp = modelFactory.getMLP();
 
-        modelFactory.train();
-        mlp = modelFactory.getMLP();
+
+
+        mlp = ModelUtils.loadModel(P4.path);
     }
 
     @Test

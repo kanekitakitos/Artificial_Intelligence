@@ -200,7 +200,7 @@ public class MLP implements Serializable {
     {
         // --- CONFIGURAÇÕES ---
         int batchSize = 64;
-        final int PATIENCE_EPOCHS = 5000;
+        final int PATIENCE_EPOCHS = 1000;
         final int VALIDATION_FREQUENCY = 10;
 
         // --- INICIALIZAÇÃO ---

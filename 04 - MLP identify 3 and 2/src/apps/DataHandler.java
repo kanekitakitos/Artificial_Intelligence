@@ -65,15 +65,20 @@ public class DataHandler {
     // --- Default File Paths ---
     private static final String[] DEFAULT_INPUT_PATHS = {
             //"src/data/borroso.csv",
-            "src/data/train/bigRuido.csv",
-            "src/data/train/8.csv",
+            //"src/data/train/bigRuido.csv",
+            "src/data/train/dataset.csv",
             //"src/data/small.csv",
     }; // bigRuido e dataset
     private static final String[] DEFAULT_OUTPUT_PATHS = {
             "src/data/train/labels.csv" // Reused for all input files
     };
-    private static final String DEFAULT_TEST_INPUT_PATH = "src/data/testData/test.csv";
-    private static final String DEFAULT_TEST_LABELS_PATH = "src/data/testData/testL.csv";
+    private static final String DEFAULT_TEST_INPUT_PATH = "src/data/testData/datasetTest.csv";
+    private static final String DEFAULT_TEST_LABELS_PATH = "src/data/testData/labelsTest.csv";
+
+    public enum NormalizationType {
+        MIN_MAX, // Normaliza para o intervalo [0, 1]
+        Z_SCORE  // Normaliza usando a média e o desvio padrão
+    }
 
     private static class DataPoint {
         final double[] input;
@@ -89,19 +94,25 @@ public class DataHandler {
     private int trainingDataSize;
     private int validationDataSize;
 
-    public DataHandler(int seed)
-    {
-        List<DataPoint> trainingData = loadAndProcess(DEFAULT_INPUT_PATHS, DEFAULT_OUTPUT_PATHS);
+    /**
+     * Construtor principal que carrega, processa e divide os dados.
+     *
+     * @param seed O seed para baralhar os dados de forma reprodutível.
+     * @param normType O tipo de normalização a ser aplicado aos dados de entrada (MIN_MAX ou Z_SCORE).
+     */
+    public DataHandler(int seed, NormalizationType normType) {
+        // Carrega e processa os dados de treino
+        List<DataPoint> trainingData = loadAndProcess(DEFAULT_INPUT_PATHS, DEFAULT_OUTPUT_PATHS, normType, null, null);
         Collections.shuffle(trainingData, new Random(seed));
         this.trainInputs = new Matrix(listTo2DArray(trainingData, true));
         this.trainOutputs = new Matrix(listTo2DArray(trainingData, false));
         this.trainingDataSize = trainingData.size();
 
-        List<DataPoint> validationData = loadAndProcess(new String[]{DEFAULT_TEST_INPUT_PATH}, new String[]{DEFAULT_TEST_LABELS_PATH});
+        // Carrega e processa os dados de validação/teste
+        List<DataPoint> validationData = loadAndProcess(new String[]{DEFAULT_TEST_INPUT_PATH}, new String[]{DEFAULT_TEST_LABELS_PATH}, normType, null, null);
         this.validationInputs = new Matrix(listTo2DArray(validationData, true));
         this.validationOutputs = new Matrix(listTo2DArray(validationData, false));
         this.validationDataSize = validationData.size();
-
     }
 
 
@@ -112,13 +123,13 @@ public class DataHandler {
      */
     @Deprecated
     public DataHandler(String[] trainInputPaths, String[] trainOutputPaths, String valInputPath, String valOutputPath, int seed) {
-        List<DataPoint> trainingData = loadAndProcess(trainInputPaths, trainOutputPaths);
+        List<DataPoint> trainingData = loadAndProcess(trainInputPaths, trainOutputPaths, NormalizationType.MIN_MAX, null, null);
         Collections.shuffle(trainingData, new Random(seed));
         this.trainInputs = new Matrix(listTo2DArray(trainingData, true));
         this.trainOutputs = new Matrix(listTo2DArray(trainingData, false));
         this.trainingDataSize = trainingData.size();
 
-        List<DataPoint> validationData = loadAndProcess(new String[]{valInputPath}, new String[]{valOutputPath});
+        List<DataPoint> validationData = loadAndProcess(new String[]{valInputPath}, new String[]{valOutputPath}, NormalizationType.MIN_MAX, null, null);
         this.validationInputs = new Matrix(listTo2DArray(validationData, true));
         this.validationOutputs = new Matrix(listTo2DArray(validationData, false));
         this.validationDataSize = validationData.size();
@@ -142,7 +153,7 @@ public class DataHandler {
      */
     public DataHandler(String[] allInputPaths, String[] allOutputPaths, double validationSplit, int seed) {
         // 1. Load all data points from all files
-        List<DataPoint> allData = loadAndProcess(allInputPaths, allOutputPaths);
+        List<DataPoint> allData = loadAndProcess(allInputPaths, allOutputPaths, NormalizationType.MIN_MAX, null, null);
 
         // 2. Shuffle the entire dataset randomly
         //Collections.shuffle(allData, new Random(seed));
@@ -187,41 +198,81 @@ public class DataHandler {
      *   <li><b>Load:</b> Aggregates the processed records into a unified list of {@code DataPoint} objects.</li>
      * </ul>
      */
-    private List<DataPoint> loadAndProcess(String[] inputPaths, String[] outputPaths)
-    {
-        // Processa cada par de ficheiros em paralelo e recolhe as listas de DataPoints.
-        return IntStream.range(0, inputPaths.length).parallel()
-                .mapToObj(i -> {
-                    String inputPath = inputPaths[i];
-                    // Usa o último ficheiro de labels se não houver um correspondente.
-                    String outputPath = (i < outputPaths.length) ? outputPaths[i] : outputPaths[outputPaths.length - 1];
+    private List<DataPoint> loadAndProcess(String[] inputPaths, String[] outputPaths, NormalizationType normType, double[] precomputedMean, double[] precomputedStdDev) {
+        // --- 1. Carregar todos os dados brutos ---
+        List<double[]> allInputs = new ArrayList<>();
+        List<double[]> allOutputs = new ArrayList<>();
 
-                    List<double[]> inputs = loadCsv(inputPath);
-                    List<double[]> outputs = loadCsv(outputPath);
+        for (int i = 0; i < inputPaths.length; i++) {
+            String inputPath = inputPaths[i];
+            String outputPath = (i < outputPaths.length) ? outputPaths[i] : outputPaths[outputPaths.length - 1];
+            List<double[]> inputs = loadCsv(inputPath);
+            List<double[]> outputs = loadCsv(outputPath);
 
-                    if (inputs.size() != outputs.size()) {
-                        throw new IllegalStateException("Input file " + inputPath + " and output file " + outputPath + " have a different number of rows.");
+            if (inputs.size() != outputs.size()) {
+                throw new IllegalStateException("Mismatch in rows between " + inputPath + " and " + outputPath);
+            }
+            allInputs.addAll(inputs);
+            allOutputs.addAll(outputs);
+        }
+
+        // --- 2. Aplicar Normalização ---
+        if (normType == NormalizationType.Z_SCORE) {
+            int numFeatures = allInputs.get(0).length;
+            double[] mean = (precomputedMean != null) ? precomputedMean : new double[numFeatures];
+            double[] stdDev = (precomputedStdDev != null) ? precomputedStdDev : new double[numFeatures];
+
+            // Calcular média e desvio padrão se não forem fornecidos
+            if (precomputedMean == null || precomputedStdDev == null) {
+                // Calcular média
+                for (double[] input : allInputs) {
+                    for (int j = 0; j < numFeatures; j++) {
+                        mean[j] += input[j];
                     }
+                }
+                for (int j = 0; j < numFeatures; j++) {
+                    mean[j] /= allInputs.size();
+                }
 
-                    // Processa as linhas de cada ficheiro e cria os DataPoints.
-                    return IntStream.range(0, inputs.size())
-                            .mapToObj(j -> {
-                                double[] input = inputs.get(j);
+                // Calcular desvio padrão
+                for (double[] input : allInputs) {
+                    for (int j = 0; j < numFeatures; j++) {
+                        stdDev[j] += Math.pow(input[j] - mean[j], 2);
+                    }
+                }
+                for (int j = 0; j < numFeatures; j++) {
+                    stdDev[j] = Math.sqrt(stdDev[j] / allInputs.size());
+                    if (stdDev[j] == 0) stdDev[j] = 1; // Evitar divisão por zero
+                }
+            }
 
-                                // Production-Ready Check: Only normalize if data appears to be in the [0, 255] pixel range.
-                                // This prevents re-normalizing already normalized data (e.g., from borroso.csv).
-                                boolean needsNormalization = Arrays.stream(input).anyMatch(val -> val > 1.0);
-                                if (needsNormalization)
-                                    for (int k = 0; k < input.length; k++)
-                                        input[k] /= 255.0;
+            // Aplicar normalização Z-score
+            for (double[] input : allInputs) {
+                for (int j = 0; j < numFeatures; j++) {
+                    input[j] = (input[j] - mean[j]) / stdDev[j];
+                }
+            }
+        } else { // MIN_MAX (comportamento original)
+            for (double[] input : allInputs) {
+                boolean needsNormalization = Arrays.stream(input).anyMatch(val -> val > 1.0);
+                if (needsNormalization) {
+                    for (int k = 0; k < input.length; k++) {
+                        input[k] /= 255.0;
+                    }
+                }
+            }
+        }
 
-                                double[] output = outputs.get(j);
-                                output[0] = (output[0] == 3.0) ? 1.0 : 0.0; // Converte 3.0 para 1.0, e o resto para 0.0
-                                return new DataPoint(input, output);
-                            }).collect(Collectors.toList());
-                })
-                .flatMap(Collection::stream) // Agrega todas as listas de DataPoints numa só.
-                .collect(Collectors.toList());
+        // --- 3. Processar outputs e criar DataPoints ---
+        List<DataPoint> dataPoints = new ArrayList<>();
+        for (int i = 0; i < allInputs.size(); i++) {
+            double[] input = allInputs.get(i);
+            double[] output = allOutputs.get(i);
+            output[0] = (output[0] == 3.0) ? 1.0 : 0.0; // Converte 3.0 para 1.0, e o resto para 0.0
+            dataPoints.add(new DataPoint(input, output));
+        }
+
+        return dataPoints;
     }
 
     private static List<double[]> loadCsv(String filePath)

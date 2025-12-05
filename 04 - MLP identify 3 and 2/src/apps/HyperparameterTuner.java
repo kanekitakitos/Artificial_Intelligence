@@ -115,25 +115,25 @@ public class HyperparameterTuner {
     private final int epochs = 30000;
 
     // --- Hiperparámetros para a busca ---
-    private final double[] learningRates = {0.01,0.02,0.03 , 0.015, 0.011
-                                        //0.005, 0.001,0.002,0.02,0.003
+    private final double[] learningRates = {0.01, 0.02,0.03 , 0.05, 0.04,0.6,0.7,
+                                        0.005, 0.001,0.002,0.003
                                         //,0.0005,0.0001,0.0002,0.00005
     };
 
-    private final double[] momentums = {//0.7, 0.8, 0.6 ,
-                                            0.7,0.9
+    private final double[] momentums = {0.7, 0.8, 0.6 ,0.5,
+                                            0.9
     };
 
     private final int[][] topologies = {
             //{400, 4, 1},
-            {400, 3, 1},
-            //{400, 2, 1},
+            //{400, 6, 1},
             //{400, 3, 1},
-            //{400, 2, 1}
+            {400, 1, 1}
 
     };
-    private final IDifferentiableFunction[][] activationFunctions = {
-            //{new Sigmoid(), new Sigmoid()},
+    private final IDifferentiableFunction[][] activationFunctions =
+            {
+            {new Sigmoid(), new Sigmoid()},
             {new TanH(), new Sigmoid()},
             //{new ReLU(), new Sigmoid()} // ReLU para camadas ocultas, Sigmoid para a saída
     };
@@ -141,18 +141,22 @@ public class HyperparameterTuner {
     /**
          * A simple data class to store the results of a single training trial.
          */
-        private record TuningResult(String paramsDescription, double accuracy) implements Comparable<TuningResult> {
+        private record TuningResult(String paramsDescription, double accuracy, double f1Score) implements Comparable<TuningResult> {
 
         @Override
             public int compareTo(TuningResult other) {
-                // Ordena por acurácia em ordem decrescente (maior é melhor)
+                // Ordena por acurácia em ordem decrescente (maior é melhor).
+                // Em caso de empate, o F1-Score pode ser usado como critério secundário.
                 return Double.compare(other.accuracy, this.accuracy);
             }
 
             @Override
             public String toString() {
-                int seed = MLP23.SEED;
-                return String.format(seed+" Parameters: [%s] -> Accuracy: %.2f%%", paramsDescription, accuracy);
+                return String.format("%d Parameters: [%s] -> Accuracy: %.2f%%, F1-Score: %.3f",
+                        MLP23.SEED,
+                        paramsDescription,
+                        accuracy,
+                        f1Score);
             }
         }
 
@@ -168,10 +172,11 @@ public class HyperparameterTuner {
         // Carrega as combinações já concluídas para evitar trabalho duplicado.
         Set<String> completedTrials = loadCompletedTrials();
         System.out.printf("Found %d previously completed trial(s). They will be skipped.\n", completedTrials.size());
+        System.out.printf("Found %d previously completed trial(s). They will be skipped.\n", completedTrials.size());
 
         // --- Otimização: Carregar os dados UMA VEZ antes de iniciar a busca ---
         System.out.println("Pre-loading and caching datasets to optimize parallel trials...");
-        DataHandler dataHandler = new DataHandler(SEED); // Usar uma seed fixa
+        DataHandler dataHandler = new DataHandler(SEED, DataHandler.NormalizationType.MIN_MAX); // Usar uma seed fixa e Z-score
         Matrix trainInputs = dataHandler.getTrainInputs();
         Matrix trainOutputs = dataHandler.getTrainOutputs();
         Matrix[] testData = DataHandler.loadDefaultTestData();
@@ -244,14 +249,15 @@ public class HyperparameterTuner {
                         System.err.print("\n[WARNING] A training trial timed out after 10 minutes and was cancelled. Skipping to the next one.\n");
                         continue; // Move to the next result
                     }
-                    TuningResult result = future.get();
-                    results.add(result);
+                    TuningResult trialResult = future.get();
+                    results.add(trialResult);
+
                     // Guarda o resultado imediatamente, mas apenas se a acurácia for superior a 90%.
-                    if (result.accuracy > 97.0) {
-                        saveResult(result);
-                        System.out.printf(">> Completed trial %d/%d. Accuracy > 90%%. Result saved.\n", (i + 1), tasks.size());
+                    if (trialResult.accuracy > 90.0) { // Limiar de exemplo
+                        saveResult(trialResult);
+                        System.out.printf(">> Completed trial %d/%d. Result saved: Accuracy: %.2f%%, F1: %.3f\n", (i + 1), tasks.size(), trialResult.accuracy, trialResult.f1Score);
                     } else {
-                        System.out.printf(">> Completed trial %d/%d. Accuracy <= 90%% (%.2f%%). Result ignored.\n", (i + 1), tasks.size(), result.accuracy);
+                        System.out.printf(">> Completed trial %d/%d. Accuracy <= 90%% (%.2f%%). Result ignored.\n", (i + 1), tasks.size(), trialResult.accuracy);
                     }
 
                 } catch (CancellationException e) {
@@ -289,8 +295,7 @@ public class HyperparameterTuner {
         if (!results.isEmpty()) {
             TuningResult bestResult = results.getFirst();
             System.out.println("\n--- BEST COMBINATION FOUND ---");
-            System.out.printf("Parameters: %s\n", bestResult.paramsDescription);
-            System.out.printf("Best Accuracy: %.2f%%\n", bestResult.accuracy);
+            System.out.println(bestResult);
         } else {
             System.out.println("\n--- No successful trials were completed. ---");
         }
@@ -323,15 +328,15 @@ public class HyperparameterTuner {
 
             // --- TEST THE TRAINED NETWORK ---
             // After training, evaluate the model's accuracy on the test dataset.
-            double accuracy = gpuTrainer.test();
-            System.out.printf("--- Finished GPU trial: [%s] -> Accuracy: %.2f%% ---\n", paramsDescription, accuracy);
+            GpuMLP23.TestMetrics metrics = gpuTrainer.test(testData[0], testData[1]);
+            System.out.printf("--- Finished GPU trial: [%s] -> Accuracy: %.2f%%, F1-Score: %.3f ---\n", paramsDescription, metrics.accuracy, metrics.f1Score);
 
-            return new TuningResult(paramsDescription, accuracy);
+            return new TuningResult(paramsDescription, metrics.accuracy, metrics.f1Score);
         } catch (ArrayIndexOutOfBoundsException e) {
             // Use e.toString() for a more descriptive message, as e.getMessage() can be null.
             System.err.printf("--- FAILED trial: [%s] -> Exception: %s. Likely a data loading issue. ---\n", paramsDescription, e.toString());
-            // Return a result with 0 accuracy to mark it as a failed trial.
-            return new TuningResult(paramsDescription, 0.0);
+            // Retorna um resultado com 0 de acurácia e F1-Score para marcar a tentativa como falhada.
+            return new TuningResult(paramsDescription, 0.0, 0.0);
         }
     }
 
@@ -390,12 +395,20 @@ public class HyperparameterTuner {
     private TuningResult parseResultFromString(String line) {
         try {
             String params = line.substring(line.indexOf('[') + 1, line.indexOf(']'));
-            String accString = line.substring(line.indexOf("Accuracy: ") + 10, line.indexOf('%'));
-            double accuracy = Double.parseDouble(accString);
-            return new TuningResult(params, accuracy);
+            double accuracy = 0.0;
+            double f1Score = 0.0;
+
+            if (line.contains("Accuracy: ")) {
+                String accString = line.substring(line.indexOf("Accuracy: ") + 10, line.indexOf('%'));
+                accuracy = Double.parseDouble(accString.replace(',', '.'));
+            }
+            if (line.contains("F1-Score: ")) {
+                String f1String = line.substring(line.indexOf("F1-Score: ") + 10);
+                f1Score = Double.parseDouble(f1String.replace(',', '.'));
+            }
+            return new TuningResult(params, accuracy, f1Score);
         } catch (Exception e) { // Captura exceções mais genéricas (e.g., NumberFormatException)
-            // Return a dummy result if parsing fails
-            return new TuningResult(line, 0.0);
+            return new TuningResult(line, 0.0, 0.0); // Retorna um resultado dummy em caso de falha
         }
     }
 

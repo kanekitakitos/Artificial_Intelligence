@@ -161,7 +161,7 @@ public class GpuMLP {
     public double train(INDArray trainInputs, INDArray trainOutputs, INDArray valInputs, INDArray valOutputs, double lr, int epochs, double momentum) {
         // --- CONFIGURAÇÕES ---
         int batchSize = 64;
-        final int PATIENCE_EPOCHS = 5000;
+        final int PATIENCE_EPOCHS = 1000;
         final int VALIDATION_FREQUENCY = 10;
 
         // --- INICIALIZAÇÃO ---

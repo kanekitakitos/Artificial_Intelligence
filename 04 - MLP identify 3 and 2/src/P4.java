@@ -29,6 +29,7 @@ import java.util.Scanner;
  */
 public class P4
 {
+    public static String path = "src/models/mlp23_99.model";
 
     /**
      * Loads a pre-trained model, reads all image data from standard input,
@@ -39,15 +40,15 @@ public class P4
     public static void main(String[] args)
     {
         // 1. Create and train the model once.
-        String path = "src/models/Seed8_8_BigRuido99.model";
-        trainMLP23(path);
+        //trainMLP23(path);
 
 
         MLP mlp = ModelUtils.loadModel(path);
 
         // 2. Read all 'm' samples from standard input.
         List<double[]> allInputs = new ArrayList<>();
-        try (Scanner scanner = new Scanner(System.in)) {
+        try (Scanner scanner = new Scanner(System.in))
+        {
             String line;
             while (scanner.hasNextLine() && !(line = scanner.nextLine()).trim().isEmpty())
             {

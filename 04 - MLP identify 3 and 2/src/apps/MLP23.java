@@ -54,10 +54,10 @@ public class MLP23
 
     private final double lr = 0.01;
     private final int epochs = 30000;
-    private final double momentum = 0.7;
+    private final double momentum = 0.9;
     private MLP mlp;
     public static final int SEED = 8; // 2;4;5 5:00 ;7;8 4:21 ;16 4:17
-    // seed 8 bigRuido e dataset 98 ---> 84.625
+
 
     /**
      * Constructs the MLP trainer with a predefined network topology and activation functions.
@@ -65,7 +65,7 @@ public class MLP23
     public MLP23()
     {
         IDifferentiableFunction[] functions = {new TanH(), new Sigmoid()};
-        int[] topology = {400, 4, 1};
+        int[] topology = {400, 1, 1};
 
         this.mlp = new MLP(topology, functions, SEED);
     }
@@ -81,7 +81,7 @@ public class MLP23
     public void train()
     {
         // 1. Load and prepare the data using DataHandler
-        DataHandler dataManager = new DataHandler(SEED);
+        DataHandler dataManager = new DataHandler(SEED, DataHandler.NormalizationType.MIN_MAX);
         // 2. Call the core training method with the prepared matrices
         train(dataManager.getTrainInputs(), dataManager.getTrainOutputs(), dataManager.getTestInputs(), dataManager.getTestOutputs());
     }

@@ -29,6 +29,11 @@ import org.nd4j.linalg.ops.transforms.Transforms;
  */
 public class GpuMLP23 {
 
+    public static class TestMetrics {
+        public final double accuracy;
+        public final double f1Score;
+        public TestMetrics(double accuracy, double f1Score) { this.accuracy = accuracy; this.f1Score = f1Score; }
+    }
     private final GpuMLP mlp;
     private final double lr;
     private final int epochs;
@@ -54,7 +59,7 @@ public class GpuMLP23 {
      */
     public void train() {
         // Load data using the existing DataHandler
-        DataHandler dataHandler = new DataHandler(SEED); // No validation split needed for this trainer
+        DataHandler dataHandler = new DataHandler(SEED, DataHandler.NormalizationType.MIN_MAX); // No validation split needed for this trainer
         Matrix trainInputsMatrix = dataHandler.getTrainInputs();
         Matrix trainOutputsMatrix = dataHandler.getTrainOutputs();
 
@@ -91,13 +96,12 @@ public class GpuMLP23 {
      *
      * @return The accuracy of the model as a percentage (e.g., 97.5).
      */
-    public double test() {
+    public TestMetrics test() {
         // Load the default test data directly into Matrix objects.
         Matrix[] testData = DataHandler.loadDefaultTestData();
 
         return test(testData[0], testData[1]);
     }
-
 
     /**
      * Evaluates the trained network against a pre-loaded test dataset.
@@ -107,28 +111,45 @@ public class GpuMLP23 {
      * @param expectedOutputsMatrix The expected output data as a {@link Matrix}.
      * @return The accuracy of the model as a percentage.
      */
-    public double test(Matrix testInputsMatrix, Matrix expectedOutputsMatrix) {
+    public TestMetrics test(Matrix testInputsMatrix, Matrix expectedOutputsMatrix) {
         // Convert to INDArray format
         INDArray testInputs = Nd4j.create(testInputsMatrix.getData()).castTo(Nd4j.dataType());
         INDArray expectedOutputs = Nd4j.create(expectedOutputsMatrix.getData()).castTo(Nd4j.dataType());
 
         // Get predictions from the trained MLP
         INDArray predictedOutputs = mlp.predict(testInputs);
-
         // Round predictions to 0 or 1 for classification
         INDArray roundedPredictions = Transforms.round(predictedOutputs);
 
-        // Compare predictions with expected labels to calculate accuracy
-        long correctPredictions = 0;
+        // --- Calcular Acurácia e Métricas para F1-Score ---
+        int truePositives = 0;
+        int falsePositives = 0;
+        int falseNegatives = 0;
+        int correctPredictions = 0;
         long totalPredictions = expectedOutputs.rows();
 
         for (int i = 0; i < totalPredictions; i++) {
-            if (roundedPredictions.getDouble(i, 0) == expectedOutputs.getDouble(i, 0)) {
+            double predictedLabel = roundedPredictions.getDouble(i, 0);
+            double actualValue = expectedOutputs.getDouble(i, 0);
+
+            if (predictedLabel == actualValue) {
                 correctPredictions++;
+            }
+
+            if (predictedLabel == 1 && actualValue == 1) {
+                truePositives++;
+            } else if (predictedLabel == 1 && actualValue == 0) {
+                falsePositives++;
+            } else if (predictedLabel == 0 && actualValue == 1) {
+                falseNegatives++;
             }
         }
 
-        // Return accuracy as a percentage
-        return (double) correctPredictions / totalPredictions * 100.0;
+        double accuracy = (double) correctPredictions / totalPredictions * 100.0;
+        double precision = (truePositives + falsePositives > 0) ? (double) truePositives / (truePositives + falsePositives) : 0.0;
+        double recall = (truePositives + falseNegatives > 0) ? (double) truePositives / (truePositives + falseNegatives) : 0.0;
+        double f1Score = (precision + recall > 0) ? 2 * (precision * recall) / (precision + recall) : 0.0;
+
+        return new TestMetrics(accuracy, f1Score);
     }
 }
