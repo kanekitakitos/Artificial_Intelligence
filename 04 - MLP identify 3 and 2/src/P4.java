@@ -34,10 +34,7 @@ public class P4
      */
     public static void main(String[] args)
     {
-        // 1. Create and train the model once.
-        //trainMLP23(path);
-
-        MLP mlp = ModelUtils.loadModel(path);
+        MLP mlp = ModelUtils.loadModelFromJson(path+".json");
 
         // 2. Read all 'm' samples from standard input.
         List<double[]> allInputs = new ArrayList<>();
@@ -86,7 +83,8 @@ public class P4
         MLP23 mlp23 = new MLP23();
         mlp23.train();
         MLP mlp = mlp23.getMLP();
-        ModelUtils.saveModel(mlp, modelPath+".model");
+        //ModelUtils.saveModel(mlp, modelPath+".model");
+
         ModelUtils.saveModelToJson(mlp, modelPath+".json");
 
 

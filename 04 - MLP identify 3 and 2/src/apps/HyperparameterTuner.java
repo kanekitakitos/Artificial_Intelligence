@@ -73,8 +73,6 @@ public static void main(String[] args) {
  *   <li><b>Random Search:</b> Instead of testing all combinations, Random Search samples a fixed
  *       number of random combinations. It often finds better models in less time.</li>
  *   <li><b>Bayesian Optimization:</b> An even more advanced technique that uses the results from
- *   <li><b>Bayesian Optimization:</b> An even more advanced technique that uses the results from
- *       previous trials to inform which combination to try next.</li>
  * </ul>
  *
  * @see MLP23
@@ -126,7 +124,7 @@ public class HyperparameterTuner {
     /**
          * A simple data class to store the results of a single training trial.
          */
-        private record TuningResult(String paramsDescription, double accuracy, double precision, double recall, double f1Score, double extraAccuracy) implements Comparable<TuningResult> {
+        private record TuningResult(int seed, String paramsDescription, double accuracy, double precision, double recall, double f1Score, double extraAccuracy) implements Comparable<TuningResult> {
 
         @Override
             public int compareTo(TuningResult other) {
@@ -138,7 +136,7 @@ public class HyperparameterTuner {
             @Override
             public String toString() {
                 String base = String.format("Seed: %d, Parameters: [%s] -> Accuracy: %.2f%%, Precision: %.4f, Recall: %.4f, F1-Score: %.4f",
-                        MLP23.SEED,
+                        seed,
                         paramsDescription, accuracy, precision, recall, f1Score);
                 // Adiciona a acurácia extra apenas se tiver sido calculada (não é 0.0)
                 return extraAccuracy > 0.0 ? base + String.format(", Extra_Acc: %.2f%%", extraAccuracy) : base;
@@ -310,12 +308,12 @@ public class HyperparameterTuner {
             }
 
             System.out.printf("--- Finished trial (Seed: %d): [%s] -> Accuracy: %.2f%%, F1-Score: %.4f ---\n", seed, paramsDescription, metrics.accuracy(), metrics.f1Score());
-            return new TuningResult(paramsDescription, metrics.accuracy(), metrics.precision(), metrics.recall(), metrics.f1Score(), extraAccuracy);
+            return new TuningResult(seed, paramsDescription, metrics.accuracy(), metrics.precision(), metrics.recall(), metrics.f1Score(), extraAccuracy);
         } catch (Exception e) {
             // Use e.toString() for a more descriptive message, as e.getMessage() can be null.
             System.err.printf("--- FAILED trial: [%s] -> Exception: %s. Likely a data loading issue. ---\n", paramsDescription, e.toString());
             // Retorna um resultado com 0 de acurácia e F1-Score para marcar a tentativa como falhada.
-            return new TuningResult(paramsDescription, 0.0, 0.0, 0.0, 0.0, 0.0);
+            return new TuningResult(seed, paramsDescription, 0.0, 0.0, 0.0, 0.0, 0.0);
         }
     }
 
@@ -355,7 +353,9 @@ public class HyperparameterTuner {
             for (int i = 0; i < tasks.size(); i++) {
                 try {
                     Future<TuningResult> future = completionService.take();
-                    results.add(future.get());
+                    TuningResult res = future.get();
+                    results.add(res);
+                    saveResult(res); // Guarda o resultado no ficheiro log
                 } catch (ExecutionException e) {
                     System.err.println("A seed trial failed: " + e.getCause().getMessage());
                 }
@@ -433,12 +433,18 @@ public class HyperparameterTuner {
      */
     private TuningResult parseResultFromString(String line) {
         try {
+            int seed = 0;
             String params = line.substring(line.indexOf('[') + 1, line.indexOf(']'));
             double accuracy = 0.0;
             double precision = 0.0;
             double recall = 0.0;
             double f1Score = 0.0;
             double extraAccuracy = 0.0;
+
+            if (line.contains("Seed: ")) {
+                String seedStr = line.substring(line.indexOf("Seed: ") + 6, line.indexOf(", Parameters:"));
+                seed = Integer.parseInt(seedStr.trim());
+            }
 
             if (line.contains("Accuracy: ")) {
                 String accString = line.substring(line.indexOf("Accuracy: ") + 10, line.indexOf('%'));
@@ -461,9 +467,9 @@ public class HyperparameterTuner {
                 extraAccuracy = Double.parseDouble(extraAccString.replace(',', '.'));
             }
 
-            return new TuningResult(params, accuracy, precision, recall, f1Score, extraAccuracy);
+            return new TuningResult(seed, params, accuracy, precision, recall, f1Score, extraAccuracy);
         } catch (Exception e) { // Captura exceções mais genéricas (e.g., NumberFormatException)
-            return new TuningResult(line, 0.0, 0.0, 0.0, 0.0, 0.0); // Retorna um resultado dummy em caso de falha
+            return new TuningResult(0, line, 0.0, 0.0, 0.0, 0.0, 0.0); // Retorna um resultado dummy em caso de falha
         }
     }
 

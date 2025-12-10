@@ -219,7 +219,7 @@ public class MLP implements Serializable {
 
                     // Imprime o progresso em intervalos regulares para feedback visual
                     if ((epoch - VALIDATION_FREQUENCY) > 0 && (epoch - VALIDATION_FREQUENCY) % 100 == 0) {
-                        //System.out.printf("Época: %-5d | LR: %.8f | (MSE): %.6f\n", epoch, currentLr, currentValidationError);
+                        System.out.printf("Época: %-5d | LR: %.8f | (MSE): %.6f\n", epoch, currentLr, currentValidationError);
                     }
 
                         // Verifica se o modelo melhorou
@@ -365,5 +365,5 @@ public class MLP implements Serializable {
 
         return clonedMlp;
     }
-    
+
 }

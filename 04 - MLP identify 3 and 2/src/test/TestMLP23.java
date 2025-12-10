@@ -8,6 +8,7 @@ import neural.ModelUtils;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.Arrays;
@@ -62,10 +63,11 @@ class TestMLP23
 
         MLP23 mlp23 = new MLP23();
         mlp23.train();
-        ModelUtils.saveModel(mlp23.getMLP(), MODEL_PATH+".model");
+        //ModelUtils.saveModel(mlp23.getMLP(), MODEL_PATH+".model");
+        ModelUtils.saveModelToJson(mlp23.getMLP(), MODEL_PATH);
 
 
-        mlp = ModelUtils.loadModel(MODEL_PATH);
+        mlp = ModelUtils.loadModelFromJson(MODEL_PATH+".json");
 
     }
 
