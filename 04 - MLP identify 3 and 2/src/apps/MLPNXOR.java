@@ -91,8 +91,13 @@ public class MLPNXOR {
                         new Sigmoid(),},
                 -1);
 
-        // Treinar a rede
-        mlp.train(trX, trY, lr, epochs);
+        // --- Treinar a rede ---
+        // Como o método train agora requer dados de validação, podemos simplesmente
+        // reutilizar os dados de treino para essa finalidade, já que este é um exemplo simples.
+        // Também definimos valores padrão para momentum e l2Lambda.
+        double momentum = 0.9;
+        double l2Lambda = 0.0; // Sem regularização para este exemplo
+        mlp.train(trX, trY, trX, trY, lr, epochs, momentum, l2Lambda);
 
 
         //Get input and create evaluation Matrix
@@ -148,7 +153,7 @@ public class MLPNXOR {
 
         // Usa setters para aplicar os pesos e bias calculados manualmente
         mlp.setWeights(new Matrix[]{weights});
-        mlp.setBiases(new double[]{bias});
+        //mlp.setBiases(new double[]{bias});
 
         System.out.println("Testando uma MLP como um único neurónio para a lógica y = x2 (padrão 0101):");
         System.out.println("Pesos: w1=0.0, w2=1.0, Bias: -0.5");

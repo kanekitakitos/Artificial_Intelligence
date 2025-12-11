@@ -47,7 +47,7 @@ class MLPMoonshak {
                         new Sigmoid(),
                         new Sigmoid(),},
                 seed);
-        mlp.train(trX, trY, lr, epochs);
+        //mlp.train(trX, trY, lr, epochs);
     }
 
 

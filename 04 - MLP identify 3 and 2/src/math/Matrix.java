@@ -2,16 +2,17 @@ package math;
 
 import java.util.Arrays;
 import java.util.Objects;
+import java.io.Serializable;
 import java.util.Random;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.IntStream;
 
 /**
- * @author hdaniel@ualg.pt
+ * @author hdaniel@ualg.pt, Brandon Mejia
  * @version 202511052002
  */
-public class Matrix {
+public class Matrix implements Serializable {
 
     private double[][] data;
     private int rows, cols;
@@ -58,6 +59,19 @@ public class Matrix {
     public double get(int row, int col) {
         return data[row][col];
     }
+
+    /**
+     * Returns a copy of the specified row as a double array.
+     * @param row The index of the row to retrieve.
+     * @return A new double array containing the data from the specified row.
+     * @throws IllegalArgumentException if the row index is out of bounds.
+     */
+    public double[] get(int row) {
+        if (row < 0 || row >= this.rows) {
+            throw new IllegalArgumentException("Invalid row index: " + row);
+        }
+        return Arrays.copyOf(data[row], this.cols);
+    }
     public int rows() { return rows; }
     public int cols() { return cols; }
 
@@ -96,6 +110,29 @@ public class Matrix {
         return this.traverse(e -> scalar - e);
     }
 
+    //divide matrix by scalar
+    public Matrix div(double scalar) {
+        if (scalar == 0) {
+            throw new IllegalArgumentException("Division by zero.");
+        }
+        return this.traverse(e -> e / scalar);
+    }
+
+    public Matrix pow(double exponent) {
+        return this.traverse(e -> Math.pow(e, exponent));
+    }
+
+    public Matrix sqrt() {
+        return this.traverse(Math::sqrt);
+    }
+
+    /**
+     * Applies the absolute value function to each element of the matrix.
+     * @return A new matrix where each element is the absolute value of the corresponding element in the original matrix.
+     */
+    public Matrix abs() {
+        return this.traverse(Math::abs);
+    }
 
     //==============================================================
     //  Element-wise operations between two matrices
@@ -128,6 +165,11 @@ public class Matrix {
     //sub two matrices
     public Matrix sub(Matrix other) {
         return this.elementWise(other, (a, b) -> a - b);
+    }
+
+    //divide two matrices (element wise)
+    public Matrix div(Matrix other) {
+        return this.elementWise(other, (a, b) -> a / b);
     }
 
 
@@ -202,6 +244,23 @@ public class Matrix {
         return result;
     }
 
+    /**
+     * Extracts a range of rows from the matrix to create a new sub-matrix.
+     * This is equivalent to slicing the matrix along its rows.
+     *
+     * @param start The starting row index (inclusive).
+     * @param end   The ending row index (exclusive).
+     * @return A new {@link Matrix} containing the specified rows.
+     */
+    public Matrix getRows(int start, int end) {
+        if (start < 0 || end > this.rows || start > end) {
+            throw new IllegalArgumentException("Invalid row range for getRows.");
+        }
+        int numRows = end - start;
+        double[][] subData = new double[numRows][this.cols];
+        System.arraycopy(this.data, start, subData, 0, numRows);
+        return new Matrix(subData);
+    }
 
     //==============================================================
     //  Convert operations
@@ -218,6 +277,11 @@ public class Matrix {
         return sb.toString();
     }
     
+    @Override
+    public Matrix clone() {
+        return new Matrix(this.data);
+    }
+
 
     //==============================================================
     //  Compare operations
@@ -233,4 +297,14 @@ public class Matrix {
     public int hashCode() {
         return Objects.hash(Arrays.deepHashCode(data), rows, cols);
     }
+
+
+    /**
+     * Returns the underlying 2D double array of the matrix.
+     * @return A 2D double array representing the matrix data.
+     */
+    public double[][] getData() {
+        return this.data;
+    }
+
 }

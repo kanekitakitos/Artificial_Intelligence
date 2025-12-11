@@ -1,20 +1,43 @@
 package neural;
 
 import math.Matrix;
+import java.io.Serializable;
 import neural.activation.IDifferentiableFunction;
 import java.util.Random;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * @author hdaniel@ualg.pt
+ * A Multi-Layer Perceptron (MLP) implementation designed for CPU-based computation.
+ * <p>
+ * This class provides a complete framework for building, training, and evaluating a neural network.
+ * It uses a custom {@link math.Matrix} class for all underlying mathematical operations, making it
+ * self-contained and independent of external numerical libraries. The core logic includes feedforward
+ * prediction and backpropagation with momentum for training.
+ * </p>
+ *
+ * <h3>Advanced Training Features</h3>
+ * <p>
+ * The {@link #(Matrix, Matrix, Matrix, Matrix, double, int, double)} method implements a sophisticated
+ * training loop that includes mini-batch processing, asynchronous validation, best-model checkpointing,
+ * and early stopping. This allows for efficient and robust training, preventing overfitting and ensuring
+ * the best-performing model is retained.
+ * </p>
+ *
+ * @author hdaniel@ualg.pt, Brandon Mejia
  * @version 202511052038
  */
-public class MLP {
+public class MLP implements Serializable {
 
     private Matrix[] w;  //weights for each layer
     private Matrix[] b;  //biases for each layer (one per neuron)
-    private Matrix[] yp; //outputs for each layer
+    private transient Matrix[] yp; //outputs for each layer (transient)
     private IDifferentiableFunction[] act; //activation functions for each layer
     private int numLayers;
+    private transient Matrix[] prevWUpdates; // For momentum (transient)
+    private transient Matrix[] prevBUpdates; // For momentum (transient)
 
     /* Create a Multi-Layer Perceptron with the given layer sizes.
      * layerSizes is an array where each element represents the number of neurons in that layer.
@@ -36,16 +59,8 @@ public class MLP {
         //create output storage for each layer but the input layer
         yp = new Matrix[numLayers];
 
-        //create weights and biases for each layer
-        //each row in w[l] represents the weights that are input
-        w = new Matrix[numLayers - 1];
-        b = new Matrix[numLayers - 1];
-
-        Random rnd = new Random(seed);
-        for (int i = 0; i < numLayers - 1; i++) {
-            w[i] = Matrix.Rand(layerSizes[i], layerSizes[i + 1], rnd);
-            b[i] = Matrix.Rand(1, layerSizes[i + 1], rnd); // One bias per neuron in the next layer
-        }
+        initializeMatrices(layerSizes, seed);
+        initializeMomentum();
     }
 
 
@@ -53,7 +68,12 @@ public class MLP {
     // also used to predict after training the net
     // yp[0] = X
     // yp[l+1] = Sigmoid( yp[l] * w[l]+b[l] )
-    public Matrix predict(Matrix X) {
+    public Matrix predict(Matrix X)
+    {
+        // Re-initialize transient fields if they are null (e.g., after deserialization)
+        if (yp == null) {
+            yp = new Matrix[numLayers];
+        }
         yp[0] = X;
         for (int l = 0; l < numLayers - 1; l++)
             yp[l + 1] = yp[l].dot(w[l]).addRowVector(b[l]).apply(act[l].fnc());
@@ -62,10 +82,15 @@ public class MLP {
 
 
     // back propagation
-    private Matrix backPropagation(Matrix X, Matrix y, double lr) {
+    private Matrix backPropagation(Matrix X, Matrix y, double lr, double momentum, double l2Lambda) {
         Matrix Eout = null;
         Matrix e = null;
         Matrix delta = null;
+
+        // Re-initialize transient fields if they are null
+        if (prevWUpdates == null || prevBUpdates == null) {
+            initializeMomentum();
+        }
 
         // back propagation using generalised delta rule
         for (int l = numLayers - 2; l >= 0; l--) {
@@ -84,131 +109,181 @@ public class MLP {
             // delta = e .* dy
             delta = e.mult(dy);
 
-            // w[l] += yp[l]^T * delta * lr
-            w[l] = w[l].add(yp[l].transpose().dot(delta).mult(lr));
-            // update biases
-            b[l] = b[l].addRowVector(delta.sumColumns().mult(lr));
+            // Calcula a atualização com momentum e regularização L2 (Weight Decay)
+            // O gradiente do erro é yp[l]^T * delta
+            // O gradiente da regularização L2 é l2Lambda * w[l]
+            Matrix grad = yp[l].transpose().dot(delta);
+            Matrix wUpdate = grad.add(w[l].mult(l2Lambda)).mult(lr).add(prevWUpdates[l].mult(momentum));
+            Matrix bUpdate = delta.sumColumns().mult(lr).add(prevBUpdates[l].mult(momentum));
+
+            w[l] = w[l].add(wUpdate);
+            b[l] = b[l].add(bUpdate);
+
+            // Salva as atualizações atuais para a próxima iteração
+            prevWUpdates[l] = wUpdate;
+            prevBUpdates[l] = bUpdate;
         }
         return Eout;
     }
 
-    /**
-     * Treina a rede com early stopping para evitar overfitting.
-     *
-     * @param X Matriz de treino (entradas).
-     * @param y Matriz de treino (saídas esperadas).
-     * @param validationX Matriz de validação (entradas).
-     * @param validationY Matriz de validação (saídas esperadas).
-     * @param learningRate A taxa de aprendizagem.
-     * @param epochs O número máximo de épocas.
-     * @param patience O número de épocas a esperar sem melhoria antes de parar.
-     * @return Array com a evolução do erro (MSE) de treino e validação.
-     */
-    public double[][] train(Matrix X, Matrix y, Matrix validationX, Matrix validationY, double learningRate, int epochs, int patience) {
-        int nSamples = X.rows();
-        int nValidationSamples = validationX.rows();
-        double[][] mseHistory = new double[epochs][2]; // [0] para treino, [1] para validação
+    private void initializeMatrices(int[] layerSizes, int seed) {
+        w = new Matrix[numLayers - 1];
+        b = new Matrix[numLayers - 1];
 
-        double bestValidationMse = Double.POSITIVE_INFINITY;
-        int epochsWithoutImprovement = 0;
-
-        // Guarda os melhores pesos e biases encontrados
-        Matrix[] bestW = null;
-        Matrix[] bestB = null;
-
-        for (int epoch = 0; epoch < epochs; epoch++) {
-            // Treino
-            predict(X);
-            Matrix trainError = backPropagation(X, y, learningRate);
-            double trainMse = trainError.dot(trainError.transpose()).get(0, 0) / nSamples;
-
-            // Validação
-            Matrix validationPrediction = predict(validationX);
-            Matrix validationError = validationY.sub(validationPrediction);
-            double validationMse = validationError.dot(validationError.transpose()).get(0, 0) / nValidationSamples;
-
-            mseHistory[epoch][0] = trainMse;
-            mseHistory[epoch][1] = validationMse;
-
-            System.out.printf("Epoch %d/%d, Train MSE: %.10f, Validation MSE: %.10f\n", epoch + 1, epochs, trainMse, validationMse);
-
-            // Lógica de Early Stopping
-            if (validationMse < bestValidationMse) {
-                bestValidationMse = validationMse;
-                epochsWithoutImprovement = 0;
-                // Salva o melhor modelo
-                bestW = this.getWeights();
-                bestB = this.getBiases();
-            } else {
-                epochsWithoutImprovement++;
-            }
-
-            if (epochsWithoutImprovement >= patience) {
-                System.out.printf("\nEarly stopping at epoch %d. Best validation MSE: %.10f\n", epoch + 1, bestValidationMse);
-                this.setWeights(bestW); // Restaura os melhores pesos
-                this.setBiases(bestB);   // Restaura os melhores biases
-                return mseHistory;
-            }
+        Random rnd = new Random(seed);
+        for (int i = 0; i < numLayers - 1; i++) {
+            w[i] = Matrix.Rand(layerSizes[i], layerSizes[i + 1], rnd);
+            b[i] = Matrix.Rand(1, layerSizes[i + 1], rnd); // One bias per neuron in the next layer
         }
-        return mseHistory;
     }
 
-    public double[] train(Matrix X, Matrix y, double learningRate, int epochs) {
-        int nSamples = X.rows();
-        double[] mse = new double[epochs];
-        double currentLearningRate = learningRate;
-        final double originalLearningRate = learningRate;
-        final int stagnationPatience = 10; // Nº de épocas para esperar antes de ativar o impulso
-        final int boostDuration = 10;       // Nº de épocas que o impulso vai durar
-        int stagnationCounter = 0;
-        int boostCounter = 0;
+    private void initializeMomentum() {
+        if (w == null) return; // Cannot initialize if weights are not set
 
-        for (int epoch=0; epoch < epochs; epoch++) {
-            predict(X);
-            //backward propagation
-            Matrix e = backPropagation(X, y, currentLearningRate);
-            //mse
-            mse[epoch] = e.dot(e.transpose()).get(0, 0) / nSamples;
+        this.prevWUpdates = new Matrix[numLayers - 1];
+        this.prevBUpdates = new Matrix[numLayers - 1];
+        for (int i = 0; i < numLayers - 1; i++) {
+            this.prevWUpdates[i] = new Matrix(w[i].rows(), w[i].cols());
+            this.prevBUpdates[i] = new Matrix(b[i].rows(), b[i].cols());
+        }
+    }
 
-            // Lógica para sair de mínimos locais
-            if (epoch > 0 && mse[epoch] == mse[epoch-1]) {
-                stagnationCounter++;
-            } else {
-                stagnationCounter = 0; // Reset se o MSE mudar
+    private Matrix[] cloneMatrices(Matrix[] matrices) {
+        if (matrices == null) return null;
+        Matrix[] clone = new Matrix[matrices.length];
+        for (int i = 0; i < matrices.length; i++) {
+            clone[i] = matrices[i].clone();
+        }
+        return clone;
+    }
+
+    /**
+     * Trains the MLP model using training and validation datasets, incorporating advanced techniques.
+     * <p>
+     * This method orchestrates the entire training process, including:
+     * <ul>
+     *     <li><b>Asynchronous Validation:</b> Performs validation on a separate thread to avoid blocking the training loop.</li>
+     *     <li><b>Best Model Checkpointing:</b> Automatically saves the model with the lowest validation error found so far.</li>
+     * </ul>
+     *
+     * @param trainInputs  The matrix of training input data.
+     * @param trainOutputs The matrix of training label data.
+     * @param valInputs    The matrix of validation input data.
+     * @param valOutputs   The matrix of validation label data.
+     * @param lr           The learning rate.
+     * @param epochs       The total number of epochs to train for.
+     * @param momentum     The momentum factor for weight updates.
+     * @return The best validation error (MSE) achieved during training.
+     */
+    public double train(Matrix trainInputs, Matrix trainOutputs, Matrix valInputs, Matrix valOutputs, double lr, int epochs, double momentum, double l2Lambda)
+    {
+        // --- CONFIGURAÇÕES ---
+        int batchSize = 32; // estava em 32
+        final int PATIENCE_EPOCHS = 500;
+        final int VALIDATION_FREQUENCY = 5;
+
+        // --- INICIALIZAÇÃO ---
+        ExecutorService validationExecutor = Executors.newSingleThreadExecutor();
+        CompletableFuture<Double> validationFuture = null;
+
+        double bestValidationError = Double.POSITIVE_INFINITY;
+        final AtomicReference<MLP> bestMlp = new AtomicReference<>();
+        int epochsSinceLastImprovement = 0;
+        int totalSamples = trainInputs.rows();
+        
+        // --- AGENDADOR DE TAXA DE APRENDIZAGEM (LEARNING RATE SCHEDULER) ---
+        final double initialLr = lr; // Guarda a taxa de aprendizagem inicial
+        // O decayRate controla a velocidade com que a taxa de aprendizagem diminui.
+        final double decayRate = initialLr / epochs;
+
+        for (int epoch = 1; epoch <= epochs; epoch++) {
+            final double currentLr = initialLr / (1 + decayRate * epoch);
+            // --- LOOP DE MINI-BATCHES ---
+            for (int i = 0; i < totalSamples; i += batchSize) {
+                int end = Math.min(i + batchSize, totalSamples);
+
+                // Fatiar os dados (Slicing) para o lote atual
+                Matrix batchX = trainInputs.getRows(i, end);
+                Matrix batchY = trainOutputs.getRows(i, end);
+
+                // Treinar apenas neste lote
+                this.predict(batchX);
+                this.backPropagation(batchX, batchY, currentLr, momentum, l2Lambda);
             }
 
-            if (boostCounter > 0) {
-                boostCounter--;
-                if (boostCounter == 0) {
-                    currentLearningRate = originalLearningRate; // Restaura o lr
-                    //System.out.printf("\n--- FIM DO IMPULSO! Taxa de aprendizagem restaurada para %.5f ---\n", currentLearningRate);
+            // --- VALIDAÇÃO ASSÍNCRONA ---
+            if (epoch % VALIDATION_FREQUENCY == 0) {
+                if (validationFuture != null) {
+                    try {
+                        double currentValidationError = validationFuture.get();
+
+                    // Imprime o progresso em intervalos regulares para feedback visual
+                    if ((epoch - VALIDATION_FREQUENCY) > 0 && (epoch - VALIDATION_FREQUENCY) % 100 == 0) {
+                        System.out.printf("Época: %-5d | LR: %.8f | (MSE): %.6f\n", epoch, currentLr, currentValidationError);
+                    }
+
+                        // Verifica se o modelo melhorou
+                        if (currentValidationError < bestValidationError) {
+                            bestValidationError = currentValidationError;
+                            bestMlp.set(this.clone()); // Checkpoint tipo um jogo
+                            epochsSinceLastImprovement = 0;
+                        } else {
+                            epochsSinceLastImprovement += VALIDATION_FREQUENCY; // Incrementa pelo intervalo
+                        }
+
+                        // Checagem de Parada Antecipada
+                        if (epochsSinceLastImprovement >= PATIENCE_EPOCHS) {
+                            System.out.printf("\nParada antecipada na época %d. Sem melhoria há %d épocas. Melhor erro: %.6f\n", epoch, epochsSinceLastImprovement, bestValidationError);
+                            validationFuture.cancel(true); // Cancela a próxima validação
+                            break;
+                        }
+
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
                 }
-            } else if (stagnationCounter >= stagnationPatience) {
-                currentLearningRate *= 20; // Aumenta o lr
-                boostCounter = boostDuration; // Ativa o contador do impulso
-                //System.out.printf("\n--- ESTAGNAÇÃO DETETADA! Impulsionando a taxa de aprendizagem para %.5f por %d épocas ---\n", currentLearningRate, boostDuration);
-                stagnationCounter = 0; // Reset para não reativar imediatamente
-            }
-
-            // Print progress
-            if ((epoch + 1) % 50 == 0) {
-                System.out.printf("Epoch %d/%d, MSE: %.50f\n", epoch + 1, epochs, mse[epoch]);
+                // Lança a próxima validação em background
+                final MLP modelCloneForValidation = this.clone();
+                validationFuture = CompletableFuture.supplyAsync(() -> {
+                    Matrix valPrediction = modelCloneForValidation.predict(valInputs);
+                    return valOutputs.sub(valPrediction).apply(x -> x * x).sum() / valInputs.rows();
+                }, validationExecutor);
             }
         }
-        return mse;
+
+        validationExecutor.shutdown();
+
+        if (bestMlp.get() != null) {
+            this.setWeights(bestMlp.get().getWeights());
+            this.setBiases(bestMlp.get().getBiases());
+        }
+
+        return bestValidationError;
     }
 
     /**
      * Returns the learned weight matrices for each layer.
      * @return An array of Matrix objects representing the weights.
      */
-    public Matrix[] getWeights() { return w; }
+    public Matrix[] getWeights() {
+        return cloneMatrices(this.w);
+    }
 
     /**
      * Returns the learned bias values for each layer.
      * @return An array of doubles representing the biases.
      */
-    public Matrix[] getBiases() { return b; }
+    public Matrix[] getBiases() {
+        return cloneMatrices(this.b);
+    }
+
+    /**
+     * Returns the activation functions used in each layer.
+     * @return An array of IDifferentiableFunction.
+     */
+    public IDifferentiableFunction[] getActivations() {
+        return this.act;
+    }
 
     /**
      * Sets the weight matrices for each layer.
@@ -231,7 +306,7 @@ public class MLP {
                         ", Got: " + newWeights[i].rows() + "x" + newWeights[i].cols());
             }
         }
-        this.w = newWeights;
+        this.w = cloneMatrices(newWeights);
     }
 
     public void setBiases(Matrix[] newBiases) {
@@ -245,7 +320,7 @@ public class MLP {
                         ", Got: " + newBiases[i].rows() + "x" + newBiases[i].cols());
             }
         }
-        this.b = newBiases;
+        this.b = cloneMatrices(newBiases);
     }
 
     // Overload for compatibility with single-neuron test case
@@ -290,4 +365,5 @@ public class MLP {
 
         return clonedMlp;
     }
+
 }
