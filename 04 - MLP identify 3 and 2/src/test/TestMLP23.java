@@ -61,13 +61,13 @@ class TestMLP23
 
 
 
-        MLP23 mlp23 = new MLP23();
-        mlp23.train();
-        //ModelUtils.saveModel(mlp23.getMLP(), MODEL_PATH+".model");
-        ModelUtils.saveModelToJson(mlp23.getMLP(), MODEL_PATH);
+//        MLP23 mlp23 = new MLP23();
+//        mlp23.train();
+//        //ModelUtils.saveModel(mlp23.json.getMLP(), MODEL_PATH+".model");
+//        ModelUtils.saveModelToJson(mlp23.getMLP(), MODEL_PATH);
 
 
-        mlp = ModelUtils.loadModelFromJson(MODEL_PATH+".json");
+        mlp = ModelUtils.loadModelFromJson(MODEL_PATH);
 
     }
 

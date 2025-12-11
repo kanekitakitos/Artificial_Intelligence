@@ -64,15 +64,12 @@ public class DataHandler {
 
     // --- Default File Paths ---
     private static final String[] DEFAULT_INPUT_PATHS = {
-            "src/data/train/dataset1.csv",
-            "src/data/train/dataset2.csv",
-            "src/data/train/dataset3.csv",
-            "src/data/train/dataset4.csv",
+            "src/data/moonshak/datasetBig.csv",
             //"src/data/train/test_apenas_novos2.csv",
 
     };
     private static final String[] DEFAULT_OUTPUT_PATHS = {
-            "src/data/train/labelsAll.csv", // Reused for all input files
+            "src/data/moonshak/labelsBig.csv", // Reused for all input files
             //"src/data/train/testL.csv",
     };
 

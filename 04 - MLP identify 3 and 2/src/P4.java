@@ -24,7 +24,7 @@ import java.util.Scanner;
  */
 public class P4
 {
-    public static String path = "src/models/mlp23";
+    public static String path = "src/models/mlp23.json";
 
     /**
      * Loads a pre-trained model, reads all image data from standard input,
@@ -34,7 +34,7 @@ public class P4
      */
     public static void main(String[] args)
     {
-        MLP mlp = ModelUtils.loadModelFromJson(path+".json");
+        MLP mlp = ModelUtils.loadModelFromJson(path);
 
         // 2. Read all 'm' samples from standard input.
         List<double[]> allInputs = new ArrayList<>();
