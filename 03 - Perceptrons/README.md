@@ -1,6 +1,6 @@
 # Problem 3: Perceptrons
 
-**Autor:** IA 2025/26
+**Autor:** Brandon Mejia
 
 Este projeto implementa uma Rede Neuronal Multicamada (MLP) em Java. O código demonstra a construção, configuração manual, treino e teste de redes neuronais para resolver tanto funções lógicas linearmente separáveis quanto não separáveis.
 
