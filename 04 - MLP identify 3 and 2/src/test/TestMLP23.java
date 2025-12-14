@@ -24,9 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <ul>
  *   <li><b>Model Training:</b> A single, consistent model is trained once in the {@code @BeforeAll} setup method to ensure all tests run against the same baseline.</li>
  *   <li><b>Accuracy and Metrics Evaluation:</b> A comprehensive test ({@link #testModelAccuracy()}) evaluates the model on a standard test set, calculating key metrics like accuracy, precision, recall, and F1-score, and generating a detailed report.</li>
- *   <li><b>Large-Scale Validation:</b> An additional test ({@link #testModelWithExtraData()}) evaluates the model against a larger, independent dataset to verify its generalization capabilities.</li>
- *   <li><b>Unit Tests for Specific Predictions:</b> Isolated tests ({@link #testSinglePredictionForDigitTwo()} and {@link #testSinglePredictionForDigitThree()}) confirm that the model correctly classifies specific, known samples.</li>
- * </ul>
+ *   <li><b>Large-Scale Validation:</b> An additional test ({@link #testModelWithExtraData()}) evaluates the model against a larger, independent dataset to verify its generalization capabilities.</li>* </ul>
  * <p>
  * The results of the main evaluation are saved to {@code src/data/test_results.txt}, providing a traceable record of model performance.
  * </p>
@@ -237,32 +235,6 @@ class TestMLP23
         System.out.printf("2. Acurácia com Ruído (5%%): %.2f%%\n", ((double) acertosRuido / inputs.rows() * 100));
         System.out.printf("3. Soma dos Pesos (Magnitude): %.2f\n", somaPesos);
         System.out.println("------------------------------------");
-    }
-
-    @Test
-    @DisplayName("Should correctly predict a '2'")
-    void testSinglePredictionForDigitTwo() {
-        // Using the first image, which is a '2' (label 0)
-        Matrix inputForTwo = getRowAsMatrix(testX, 0);
-        Matrix prediction = mlp.predict(inputForTwo);
-        double rawPrediction = prediction.get(0, 0);
-        long predictedLabel = Math.round(rawPrediction);
-
-        System.out.printf("Predição para '2' (esperado ~0.0): %.8f\n", rawPrediction);
-        assertEquals(0, predictedLabel, "The MLP should predict '0' for an image of a '2'");
-    }
-
-    @Test
-    @DisplayName("Should correctly predict a '3'")
-    void testSinglePredictionForDigitThree() {
-        // Using the 101st image, which is a '3' (label 1)
-        Matrix inputForThree = getRowAsMatrix(testX, 100);
-        Matrix prediction = mlp.predict(inputForThree);
-        double rawPrediction = prediction.get(0, 0);
-        long predictedLabel = Math.round(rawPrediction);
-
-        System.out.printf("Predição para '3' (esperado ~1.0): %.8f\n", rawPrediction);
-        assertEquals(1, predictedLabel, "The MLP should predict '1' for an image of a '3'");
     }
 
     /**

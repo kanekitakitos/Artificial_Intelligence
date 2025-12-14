@@ -88,7 +88,7 @@ public class HyperparameterTuner {
      */
     private static final String RESULTS_FILE = "src/data/tuning_results.log";
 
-    private final boolean findSeed = false;
+
     private final int SEED = MLP23.SEED;
     private final int epochs = 10000;
 
@@ -118,6 +118,30 @@ public class HyperparameterTuner {
             0.0,
             0.00001,
     };
+
+
+    private final boolean findSeed = false;
+
+    /**
+     * Entry point to run the optimizer.
+     */
+    public static void main(String[] args)
+    {
+        HyperparameterTuner tuner = new HyperparameterTuner();
+        if(tuner.findSeed)
+        {
+            // Testa 100 seeds diferentes na configuração vencedora para encontrar a "sortuda"
+            int[] seedsToTest = new int[100];
+            for(int i=0; i<100; i++) seedsToTest[i] = i + 1;
+
+            // Configuração Otimizada: [400, 3, 1], LR 0.0020, Momentum 0.99
+            tuner.findBestSeedForConfig(new int[]{400, 3, 1}, new IDifferentiableFunction[]{new Sigmoid(), new Sigmoid()}, 0.0020, 0.99, 0.0, seedsToTest);
+        }
+        else
+            // Cenário 1: Executar a busca em grade completa
+            tuner.runGridSearch();
+
+    }
 
     /**
          * A simple data class to store the results of a single training trial.
@@ -471,24 +495,4 @@ public class HyperparameterTuner {
         }
     }
 
-
-    /**
-     * Entry point to run the optimizer.
-     */
-    public static void main(String[] args) {
-        HyperparameterTuner tuner = new HyperparameterTuner();
-        if(tuner.findSeed)
-        {
-            // Testa 100 seeds diferentes na configuração vencedora para encontrar a "sortuda"
-            int[] seedsToTest = new int[100];
-            for(int i=0; i<100; i++) seedsToTest[i] = i + 1;
-            
-            // Configuração Otimizada: [400, 3, 1], LR 0.0020, Momentum 0.99
-            tuner.findBestSeedForConfig(new int[]{400, 3, 1}, new IDifferentiableFunction[]{new Sigmoid(), new Sigmoid()}, 0.0020, 0.99, 0.0, seedsToTest);
-        }
-        else
-        // Cenário 1: Executar a busca em grade completa
-           tuner.runGridSearch();
-
-    }
 }

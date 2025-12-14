@@ -57,28 +57,20 @@ import java.util.stream.IntStream;
  *
  * @see MLP
  * @see Matrix
- * @author Brandon Mejia, hdaniel@ualg.pt
+ * @author Brandon Mejia
  * @version 2025-11-30
  */
 public class DataHandler {
 
     // --- Default File Paths ---
     private static final String[] DEFAULT_INPUT_PATHS = {
-//            "src/data/train/dataset1.csv",
-//            "src/data/train/dataset2.csv",
-//            "src/data/train/dataset3.csv",
-//            "src/data/train/dataset4.csv",
             "src/data/moonshak/datasetBig.csv",
             "src/data/train/final.csv",
 
-            //"src/data/train/test_apenas_novos2.csv",
 
     };
     private static final String[] DEFAULT_OUTPUT_PATHS = {
-//            "src/data/train/labelsAll.csv", // Reused for all input files
-//            "src/data/train/labels2.csv",
-//            "src/data/train/labels3.csv",
-//            "src/data/train/labels4.csv",
+//            "src/data/train/labelsAll.csv", // Reused for all input files if only is one.
             "src/data/moonshak/labelsBig.csv",
             "src/data/train/finalL.csv",
 

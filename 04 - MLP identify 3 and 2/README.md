@@ -109,7 +109,7 @@ O foco desta experimentação foi avaliar a robustez da rede manipulando a vari�
 A solução final resolve o problema de classificação com distinção, respeitando o princípio de usar a complexidade apenas quando estritamente necessária.
 
 ### Desempenho no Mooshak
-Com a configuração otimizada, o grupo atingiu uma classificação de **92.25%** na plataforma Mooshak (modelo `src/models/92_250`).
+Com a configuração otimizada, o grupo obteve dois modelos de destaque na plataforma Mooshak: um com classificação de **92.25%** (modelo `src/models/92_250`) e outro com **92.35%**.
 
 **Estratégia Vencedora:**
 A estratégia que garantiu o melhor desempenho consistiu em **cortar os primeiros 7 bits** (de cima para baixo) de cada imagem. Esta técnica permitiu que a rede se focasse exclusivamente nas partes distintivas dos dígitos, ignorando a zona superior das imagens que continha pouca informação relevante.
