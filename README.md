@@ -14,7 +14,25 @@ All algorithms are implemented *from scratch*, without the use of external machi
 
 ## 🚀 Available Laboratories
 
-### 🧩 Lab 02: Problem Heuristics
+### 🧩 [Lab 00: Small Instances of the 8-puzzle](00%20-%20Small%20Instances%20of%20the%208-puzzle/)
+**Introduction to state-space search using the 8-puzzle**
+
+- **Scope**: Solving 3x3 sliding tile puzzles.
+- **Topics Covered**:
+    - State representation (`Board` class)
+    - Implementation of the `Ilayout` interface
+    - Best-First Search algorithm (Uniform-Cost Search variant)
+
+### 🔢 [Lab 01: Problem Array Sorting](01%20-%Problem%20Array%208Sorting/)
+**Sorting arrays via Uniform-Cost Search**
+
+- **Scope**: Finding the optimal sequence of swaps to sort an array with variable swap costs.
+- **Topics Covered**:
+    - Abstract search architecture (`AbstractSearch` template)
+    - Uniform-Cost Search (`GSolver`)
+    - Cost function implementation for state transitions
+
+### 🧩 [Lab 02: Problem Heuristics](02%20-%20Problem%20Heuristics%20for%20the%20Array%20Sorting/)
 **Application of heuristic methods to sorting and search problems**
 
 - **Scope**: Heuristic search strategies and array sorting problems.
@@ -24,7 +42,7 @@ All algorithms are implemented *from scratch*, without the use of external machi
     - Comparative analysis of heuristic-based sorting and search approaches
     - Computational complexity considerations
 
-### 🤖 Lab 03: Perceptrons
+### 🤖 [Lab 03: Perceptrons](03%20-%20Perceptrons/)
 **Implementation of the single-layer neural network model**
 
 - **Core Component**: `Matrix.java`
@@ -44,7 +62,7 @@ Matrix weights = Matrix.Rand(2, 1, 12345);
 Matrix output = input.dot(weights);
 ```
 
-### 👁️ Lab 04: MLP – Identification of Digits 3 and 2
+### 👁️ [Lab 04: MLP – Identification of Digits 3 and 2](04%20-%20MLP%20identify%203%20and%202/)
 **Multi-Layer Perceptron applied to computer vision**
 
 - **Scope**: Binary classification of handwritten digits (3 versus 2).
