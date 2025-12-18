@@ -23,7 +23,7 @@ All algorithms are implemented *from scratch*, without the use of external machi
     - Implementation of the `Ilayout` interface
     - Best-First Search algorithm (Uniform-Cost Search variant)
 
-### 🔢 [Lab 01: Problem Array Sorting](01%20-%20Problem%20Array%20Sorting)
+### 🔢 [Lab 01: Problem Array Sorting](01%20-%20Problem%20Array%20sorting)
 **Sorting arrays via Uniform-Cost Search**
 
 - **Scope**: Finding the optimal sequence of swaps to sort an array with variable swap costs.
