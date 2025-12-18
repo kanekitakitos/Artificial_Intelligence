@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/00 - Small Instances of the 8-puzzle/00 - Small Instances of the 8-puzzle.iml" filepath="$PROJECT_DIR$/00 - Small Instances of the 8-puzzle/00 - Small Instances of the 8-puzzle.iml" />
+      <module fileurl="file://$PROJECT_DIR$/01 - Problem Array sorting/01 - Problem Array sorting.iml" filepath="$PROJECT_DIR$/01 - Problem Array sorting/01 - Problem Array sorting.iml" />
+      <module fileurl="file://$PROJECT_DIR$/02 - Problem Heuristics for the Array Sorting/02 - Problem Heuristics for the Array Sorting.iml" filepath="$PROJECT_DIR$/02 - Problem Heuristics for the Array Sorting/02 - Problem Heuristics for the Array Sorting.iml" />
+      <module fileurl="file://$PROJECT_DIR$/03 - Perceptrons/03 - Perceptrons.iml" filepath="$PROJECT_DIR$/03 - Perceptrons/03 - Perceptrons.iml" />
+      <module fileurl="file://$PROJECT_DIR$/04 - MLP identify 3 and 2/04 - MLP identify 3 and 2.iml" filepath="$PROJECT_DIR$/04 - MLP identify 3 and 2/04 - MLP identify 3 and 2.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/Inteligencia_Artificial.iml" filepath="$PROJECT_DIR$/.idea/Inteligencia_Artificial.iml" />
+    </modules>
+  </component>
+</project>
